@@ -11,11 +11,17 @@ Carte Lovelace pour piloter une alarme `alarm_control_panel`, avec un éditeur v
 
 ## Installation
 
-1. Copier `customizable-alarm-card.js` dans `/config/www/customizable-alarm-card.js`.
-2. **Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter** : URL `/local/customizable-alarm-card.js?v=1.0.0`, type *Module JavaScript*.
-3. Recharger le navigateur, puis ajouter la carte « Customizable Alarm Card » depuis le sélecteur de cartes.
+### HACS (dépôt personnalisé)
 
-Après une mise à jour du fichier, incrémenter `?v=` dans l'URL de la ressource pour vider le cache.
+1. HACS → menu ⋮ → *Dépôts personnalisés* → ajoutez `https://github.com/Ergorock/customizable-alarm-card`, catégorie **Dashboard**.
+2. Installez **Customizable Alarm Card**, puis rechargez le navigateur.
+
+### Manuelle
+
+1. Copiez `customizable-alarm-card.js` dans `config/www/customizable-alarm-card.js`.
+2. *Paramètres → Tableaux de bord → ⋮ → Ressources* : ajoutez `/local/customizable-alarm-card.js?v=1.0.0` (type *Module JavaScript*).
+
+Après une mise à jour du fichier, incrémentez `?v=` dans l'URL de la ressource pour vider le cache.
 
 ## Exemple de configuration
 
