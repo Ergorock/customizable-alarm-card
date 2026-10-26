@@ -1,87 +1,90 @@
 # Customizable Alarm Card
 
-Carte Lovelace pour piloter une alarme `alarm_control_panel`, avec un éditeur visuel complet.
+*[Version française](README.fr.md)*
 
-- **Bandeau d'état** coloré selon l'état (désarmée, nuit, absent, armement, déclenchée…), avec animation de pulsation quand l'alarme est armée et clignotement si elle est déclenchée. Affiche « depuis 15:36 · par Ha ».
-- **Pastilles d'information** : batteries (icône et alerte selon le niveau), interrupteurs basculables d'un tap (mode privé caméra…), n'importe quel capteur.
-- **Tuiles de modes** illustrées (image de fond + dégradé de couleur), badge « Actif » sur le mode en cours, spinner pendant l'armement, confirmation optionnelle par double tap.
-  Chaque mode lance une scène, un script ou un bouton, ou pilote directement l'alarme (avec pavé de code si l'alarme en demande un).
-- **Aperçu caméra** optionnel, flouté quand le mode privé est actif.
-- **Éditeur visuel** : sections Général / Modes / Informations / Caméra / Apparence, ajout, suppression et réordonnancement des modes et des pastilles, couleurs par état.
+Lovelace card to control an `alarm_control_panel` alarm, with a full visual editor.
+
+- **Status banner** colored by state (disarmed, night, away, arming, triggered…), with a pulse animation while armed and flashing when triggered. Shows “since 15:36 · by Ha”.
+- **Information chips**: batteries (icon and alert by level), switches toggled with a tap (camera privacy mode…), any sensor.
+- **Illustrated mode tiles** (background image + color gradient), “Active” badge on the current mode, spinner while arming, optional confirmation by double tap.
+  Each mode runs a scene, a script or a button, or controls the alarm directly (with a keypad if the alarm needs a code).
+- Optional **camera preview**, blurred while privacy mode is on.
+- **Visual editor**: General / Modes / Information / Camera / Appearance sections, add, remove and reorder modes and chips, colors by state.
+- Interface in English and French (follows the Home Assistant language).
 
 ## Installation
 
-### HACS (dépôt personnalisé)
+### HACS (custom repository)
 
-1. HACS → menu ⋮ → *Dépôts personnalisés* → ajoutez `https://github.com/Ergorock/customizable-alarm-card`, catégorie **Dashboard**.
-2. Installez **Customizable Alarm Card**, puis rechargez le navigateur.
+1. HACS → ⋮ menu → *Custom repositories* → add `https://github.com/Ergorock/customizable-alarm-card`, category **Dashboard**.
+2. Install **Customizable Alarm Card**, then reload your browser.
 
-### Manuelle
+### Manual
 
-1. Copiez `customizable-alarm-card.js` dans `config/www/customizable-alarm-card.js`.
-2. *Paramètres → Tableaux de bord → ⋮ → Ressources* : ajoutez `/local/customizable-alarm-card.js?v=1.0.0` (type *Module JavaScript*).
+1. Copy `customizable-alarm-card.js` to `config/www/customizable-alarm-card.js`.
+2. *Settings → Dashboards → ⋮ → Resources*: add `/local/customizable-alarm-card.js?v=1.0.0` (type *JavaScript module*).
 
-Après une mise à jour du fichier, incrémentez `?v=` dans l'URL de la ressource pour vider le cache.
+After updating the file, increment `?v=` in the resource URL to clear the cache.
 
-## Exemple de configuration
+## Example configuration
 
 ```yaml
 type: custom:customizable-alarm-card
-entity: alarm_control_panel.somfy_home_alarm_maison
-name: Alarme maison
-history_entity: text.somfy_home_alarm_maison_history
+entity: alarm_control_panel.somfy_home_alarm_house
+name: House alarm
+history_entity: text.somfy_home_alarm_house_history
 camera_entity: camera.tapo_c610_sd_stream_direct
 privacy_entity: switch.tapo_c610_privacy
 columns: 3
 tile_height: 160
 modes:
-  - name: Désactiver
-    label: Désarmement
+  - name: Disarm
+    label: Disarming
     state: disarmed
-    entity: scene.desactivation_alarme
+    entity: scene.alarm_off
     image: /local/images/open.png
     icon: mdi:shield-off-outline
     color: [60, 170, 80]
-  - name: Activer l'alarme nuit
-    label: Armement partiel
+  - name: Night alarm
+    label: Partial arming
     state: armed_night
-    entity: scene.activation_alarme
+    entity: scene.alarm_on
     image: /local/images/closed.png
     icon: mdi:weather-night
     color: [220, 100, 0]
-  - name: Mode absent
-    label: Armement total
+  - name: Away mode
+    label: Full arming
     state: armed_away
-    entity: scene.activation_alarme_absent
+    entity: scene.alarm_away
     image: /local/images/closed.png
     icon: mdi:shield-lock
     color: [180, 20, 20]
 info:
-  - entity: sensor.batterie_alarme
-    name: Batterie mini
+  - entity: sensor.alarm_battery
+    name: Lowest battery
   - entity: switch.tapo_c610_privacy
-    name: Mode privé
+    name: Privacy mode
   - entity: sensor.tapo_c610_battery
-    name: Caméra
+    name: Camera
 ```
 
 ## Options
 
-| Option | Description | Défaut |
+| Option | Description | Default |
 |---|---|---|
-| `entity` | Entité `alarm_control_panel` (obligatoire) | |
-| `name` | Titre du bandeau | `Alarme` |
-| `history_entity` | Entité dont l'attribut `user` sert à afficher « par … » | |
-| `show_last_change` | Affiche « depuis … par … » | `true` |
-| `camera_entity` | Caméra affichée sous le bandeau | |
-| `camera_name` | Nom affiché sur l'aperçu | nom de l'entité |
-| `camera_refresh` | Rafraîchissement de l'image (s) | `10` |
-| `privacy_entity` | Interrupteur qui floute l'aperçu quand il est `on` | |
-| `columns` | Nombre de colonnes de tuiles (2 max sous 520 px de large) | `3` |
-| `tile_height` | Hauteur des tuiles (px) | `150` |
-| `glass` | Fond verre dépoli | `true` |
-| `state_colors` | Couleur par état, ex. `armed_night: [220, 75, 75]` ou `"#dc4b4b"` | |
-| `modes` | Liste des tuiles (voir ci-dessous) | |
-| `info` | Liste des pastilles : `entity`, `name`, `icon`, `low_threshold` (batteries) | |
+| `entity` | `alarm_control_panel` entity (required) | |
+| `name` | Banner title | `Alarm` |
+| `history_entity` | Entity whose `user` attribute is used to show “by …” | |
+| `show_last_change` | Shows “since … by …” | `true` |
+| `camera_entity` | Camera shown under the banner | |
+| `camera_name` | Name shown on the preview | entity name |
+| `camera_refresh` | Image refresh interval (s) | `10` |
+| `privacy_entity` | Switch that blurs the preview when `on` | |
+| `columns` | Number of tile columns (2 max below 520 px wide) | `3` |
+| `tile_height` | Tile height (px) | `150` |
+| `glass` | Frosted glass background | `true` |
+| `state_colors` | Color per state, e.g. `armed_night: [220, 75, 75]` or `"#dc4b4b"` | |
+| `modes` | List of tiles (see below) | |
+| `info` | List of chips: `entity`, `name`, `icon`, `low_threshold` (batteries) | |
 
-**Mode** : `name`, `label` (sous-titre), `state` (état d'alarme qui rend la tuile « Active »), `entity` (scène / script / bouton à lancer ; vide = appel direct `alarm_control_panel.alarm_*`), `icon`, `image`, `color`, `confirm` (demande un second tap).
+**Mode**: `name`, `label` (subtitle), `state` (alarm state that makes the tile “Active”), `entity` (scene / script / button to run; empty = direct `alarm_control_panel.alarm_*` call), `icon`, `image`, `color`, `confirm` (asks for a second tap).

@@ -7,20 +7,184 @@
 
 const CARD_VERSION = "1.0.0";
 
-const STATE_INFO = {
-  disarmed: { label: "Désarmée", icon: "mdi:shield-off-outline", color: [67, 160, 71] },
-  armed_home: { label: "Armée · présence", icon: "mdi:shield-home", color: [30, 136, 229] },
-  armed_away: { label: "Armée · absent", icon: "mdi:shield-lock", color: [240, 140, 30] },
-  armed_night: { label: "Armée · nuit", icon: "mdi:shield-moon", color: [220, 75, 75] },
-  armed_vacation: { label: "Armée · vacances", icon: "mdi:shield-airplane", color: [142, 36, 170] },
-  armed_custom_bypass: { label: "Armée · personnalisé", icon: "mdi:security", color: [0, 137, 123] },
-  arming: { label: "Armement en cours…", icon: "mdi:shield-sync", color: [235, 190, 40] },
-  pending: { label: "Délai d'entrée…", icon: "mdi:shield-alert-outline", color: [235, 190, 40] },
-  disarming: { label: "Désarmement…", icon: "mdi:shield-sync", color: [235, 190, 40] },
-  triggered: { label: "Alarme déclenchée !", icon: "mdi:bell-ring", color: [230, 20, 20] },
-  unavailable: { label: "Indisponible", icon: "mdi:shield-remove-outline", color: [117, 117, 140] },
-  unknown: { label: "Inconnu", icon: "mdi:shield-outline", color: [117, 117, 140] },
+const STRINGS = {
+  en: {
+    card_description: "Alarm control: state, illustrated modes, batteries, privacy mode and camera.",
+    default_name: "Alarm",
+    state_disarmed: "Disarmed",
+    state_armed_home: "Armed · home",
+    state_armed_away: "Armed · away",
+    state_armed_night: "Armed · night",
+    state_armed_vacation: "Armed · vacation",
+    state_armed_custom_bypass: "Armed · custom",
+    state_arming: "Arming…",
+    state_pending: "Entry delay…",
+    state_disarming: "Disarming…",
+    state_triggered: "Alarm triggered!",
+    state_unavailable: "Unavailable",
+    state_unknown: "Unknown",
+    since_today: "since {time}",
+    since_yesterday: "since yesterday {time}",
+    since_date: "since {date} {time}",
+    by: " · by {name}",
+    stub_disarm: "Disarm",
+    stub_disarm_label: "Disarming",
+    stub_night: "Night",
+    stub_night_label: "Partial arming",
+    stub_away: "Away",
+    stub_away_label: "Full arming",
+    no_entity: "Please choose an alarm entity (alarm_control_panel).",
+    entity_not_found: "Entity not found: {entity}",
+    on: "On",
+    off: "Off",
+    active: "Active",
+    mode: "Mode",
+    tap_to_confirm: "Tap again to confirm",
+    privacy_on: "Privacy mode on",
+    code_for: "Code for “{name}”",
+    cancel: "Cancel",
+    no_action: "No action for state {state}",
+    alarm_error: "Alarm: {error}",
+    label_entity: "Alarm entity",
+    label_name: "Title",
+    label_history_entity: "History entity (optional, for “by …”)",
+    label_camera_entity: "Camera (optional)",
+    label_camera_name: "Camera display name",
+    label_privacy_entity: "Privacy mode switch (blurs the camera)",
+    label_camera_refresh: "Camera refresh",
+    label_columns: "Mode columns",
+    label_tile_height: "Tile height",
+    label_glass: "Frosted glass effect",
+    label_show_last_change: "Show “since … by …”",
+    label_state_colors: "Colors by state",
+    label_label: "Subtitle",
+    label_state: "Matching alarm state",
+    label_icon: "Icon",
+    label_image: "Background image (e.g. /local/images/open.png)",
+    label_color: "Color",
+    label_confirm: "Ask for confirmation",
+    label_low_threshold: "Low battery threshold (%)",
+    helper_entity: "Scene, script or button to run. Leave empty to control the alarm directly with the chosen state.",
+    helper_state: "The tile shows “Active” when the alarm is in this state.",
+    section_general: "General",
+    section_modes: "Arming modes",
+    hint_modes: "Each mode is a clickable tile. Tap a row to expand it.",
+    add_mode: "Add a mode",
+    section_info: "Information (chips)",
+    hint_info: "Batteries, switches (privacy mode…), sensors. Switches toggle with a tap.",
+    add_info: "Add an information chip",
+    section_camera: "Camera",
+    section_look: "Appearance",
+    move_up: "Move up",
+    move_down: "Move down",
+    delete: "Delete",
+    direct_action: "direct alarm action",
+    new_info: "New information",
+    choose_entity: "Choose an entity",
+  },
+  fr: {
+    card_description: "Pilotage de l'alarme : état, modes illustrés, batteries, mode privé et caméra.",
+    default_name: "Alarme",
+    state_disarmed: "Désarmée",
+    state_armed_home: "Armée · présence",
+    state_armed_away: "Armée · absent",
+    state_armed_night: "Armée · nuit",
+    state_armed_vacation: "Armée · vacances",
+    state_armed_custom_bypass: "Armée · personnalisé",
+    state_arming: "Armement en cours…",
+    state_pending: "Délai d'entrée…",
+    state_disarming: "Désarmement…",
+    state_triggered: "Alarme déclenchée !",
+    state_unavailable: "Indisponible",
+    state_unknown: "Inconnu",
+    since_today: "depuis {time}",
+    since_yesterday: "depuis hier {time}",
+    since_date: "depuis le {date} {time}",
+    by: " · par {name}",
+    stub_disarm: "Désactiver",
+    stub_disarm_label: "Désarmement",
+    stub_night: "Nuit",
+    stub_night_label: "Armement partiel",
+    stub_away: "Absent",
+    stub_away_label: "Armement total",
+    no_entity: "Veuillez choisir une entité d'alarme (alarm_control_panel).",
+    entity_not_found: "Entité introuvable : {entity}",
+    on: "Activé",
+    off: "Désactivé",
+    active: "Actif",
+    mode: "Mode",
+    tap_to_confirm: "Touchez à nouveau pour confirmer",
+    privacy_on: "Mode privé activé",
+    code_for: "Code pour « {name} »",
+    cancel: "Annuler",
+    no_action: "Aucune action pour l'état {state}",
+    alarm_error: "Alarme : {error}",
+    label_entity: "Entité alarme",
+    label_name: "Titre",
+    label_history_entity: "Entité historique (optionnelle, pour « par … »)",
+    label_camera_entity: "Caméra (optionnelle)",
+    label_camera_name: "Nom affiché de la caméra",
+    label_privacy_entity: "Interrupteur mode privé (floute la caméra)",
+    label_camera_refresh: "Rafraîchissement caméra",
+    label_columns: "Colonnes de modes",
+    label_tile_height: "Hauteur des tuiles",
+    label_glass: "Effet verre dépoli",
+    label_show_last_change: "Afficher « depuis … par … »",
+    label_state_colors: "Couleurs par état",
+    label_label: "Sous-titre",
+    label_state: "État d'alarme correspondant",
+    label_icon: "Icône",
+    label_image: "Image de fond (ex. /local/images/open.png)",
+    label_color: "Couleur",
+    label_confirm: "Demander une confirmation",
+    label_low_threshold: "Seuil batterie faible (%)",
+    helper_entity: "Scène, script ou bouton à lancer. Laisser vide pour piloter directement l'alarme selon l'état choisi.",
+    helper_state: "La tuile s'affiche « Active » quand l'alarme est dans cet état.",
+    section_general: "Général",
+    section_modes: "Modes d'armement",
+    hint_modes: "Chaque mode est une tuile cliquable. Touchez une ligne pour la déplier.",
+    add_mode: "Ajouter un mode",
+    section_info: "Informations (pastilles)",
+    hint_info: "Batteries, interrupteurs (mode privé…), capteurs. Les interrupteurs se basculent d'un tap.",
+    add_info: "Ajouter une information",
+    section_camera: "Caméra",
+    section_look: "Apparence",
+    move_up: "Monter",
+    move_down: "Descendre",
+    delete: "Supprimer",
+    direct_action: "action directe sur l'alarme",
+    new_info: "Nouvelle information",
+    choose_entity: "Choisissez une entité",
+  },
 };
+
+// Langue de l'interface : celle de Home Assistant (français ou anglais, anglais par défaut)
+let lang = (navigator.language || "").startsWith("fr") ? "fr" : "en";
+const setLang = (hass) => {
+  const l = hass?.locale?.language || hass?.language;
+  if (l) lang = l.startsWith("fr") ? "fr" : "en";
+};
+const t = (key, vars = {}) =>
+  (STRINGS[lang][key] ?? STRINGS.en[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+
+const STATE_INFO = {
+  disarmed: { icon: "mdi:shield-off-outline", color: [67, 160, 71] },
+  armed_home: { icon: "mdi:shield-home", color: [30, 136, 229] },
+  armed_away: { icon: "mdi:shield-lock", color: [240, 140, 30] },
+  armed_night: { icon: "mdi:shield-moon", color: [220, 75, 75] },
+  armed_vacation: { icon: "mdi:shield-airplane", color: [142, 36, 170] },
+  armed_custom_bypass: { icon: "mdi:security", color: [0, 137, 123] },
+  arming: { icon: "mdi:shield-sync", color: [235, 190, 40] },
+  pending: { icon: "mdi:shield-alert-outline", color: [235, 190, 40] },
+  disarming: { icon: "mdi:shield-sync", color: [235, 190, 40] },
+  triggered: { icon: "mdi:bell-ring", color: [230, 20, 20] },
+  unavailable: { icon: "mdi:shield-remove-outline", color: [117, 117, 140] },
+  unknown: { icon: "mdi:shield-outline", color: [117, 117, 140] },
+};
+// Libellé de chaque état, dans la langue courante
+Object.entries(STATE_INFO).forEach(([state, info]) =>
+  Object.defineProperty(info, "label", { get: () => t(`state_${state}`) })
+);
 
 const MODE_STATES = [
   "disarmed",
@@ -44,7 +208,6 @@ const TRANSITION_STATES = ["arming", "pending", "disarming"];
 const TOGGLE_DOMAINS = ["switch", "input_boolean", "light", "fan", "siren"];
 
 const DEFAULTS = {
-  name: "Alarme",
   columns: 3,
   tile_height: 150,
   glass: true,
@@ -83,13 +246,14 @@ function batteryIcon(level) {
 function formatSince(iso) {
   const d = new Date(iso);
   if (isNaN(d)) return "";
-  const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const locale = lang === "fr" ? "fr-FR" : "en";
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
   const now = new Date();
-  if (d.toDateString() === now.toDateString()) return `depuis ${time}`;
+  if (d.toDateString() === now.toDateString()) return t("since_today", { time });
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return `depuis hier ${time}`;
-  return `depuis le ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} ${time}`;
+  if (d.toDateString() === yesterday.toDateString()) return t("since_yesterday", { time });
+  return t("since_date", { date: d.toLocaleDateString(locale, { day: "numeric", month: "short" }), time });
 }
 
 const STYLES = `
@@ -367,14 +531,15 @@ class CustomizableAlarmCard extends HTMLElement {
   }
 
   static getStubConfig(hass) {
+    setLang(hass);
     const entity = Object.keys(hass?.states || {}).find((e) => e.startsWith("alarm_control_panel.")) || "";
     return {
       entity,
-      name: "Alarme",
+      name: t("default_name"),
       modes: [
-        { name: "Désactiver", label: "Désarmement", state: "disarmed", icon: "mdi:shield-off-outline" },
-        { name: "Nuit", label: "Armement partiel", state: "armed_night", icon: "mdi:shield-moon" },
-        { name: "Absent", label: "Armement total", state: "armed_away", icon: "mdi:shield-lock" },
+        { name: t("stub_disarm"), label: t("stub_disarm_label"), state: "disarmed", icon: "mdi:shield-off-outline" },
+        { name: t("stub_night"), label: t("stub_night_label"), state: "armed_night", icon: "mdi:shield-moon" },
+        { name: t("stub_away"), label: t("stub_away_label"), state: "armed_away", icon: "mdi:shield-lock" },
       ],
       info: [],
     };
@@ -382,7 +547,7 @@ class CustomizableAlarmCard extends HTMLElement {
 
   setConfig(config) {
     if (!config || !config.entity) {
-      throw new Error("Veuillez choisir une entité d'alarme (alarm_control_panel).");
+      throw new Error(t("no_entity"));
     }
     this._config = { ...DEFAULTS, ...config };
     if (!this.shadowRoot) {
@@ -396,6 +561,7 @@ class CustomizableAlarmCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    setLang(hass);
     if (this._pending && this._config) {
       const state = hass.states[this._config.entity]?.state;
       const target = this._config.modes?.[this._pending.index]?.state;
@@ -478,7 +644,7 @@ class CustomizableAlarmCard extends HTMLElement {
     }
     const st = hass.states[c.entity];
     if (!st) {
-      this.shadowRoot.innerHTML = `<style>${STYLES}</style><ha-card><div class="warning">Entité introuvable : ${esc(c.entity)}</div></ha-card>`;
+      this.shadowRoot.innerHTML = `<style>${STYLES}</style><ha-card><div class="warning">${esc(t("entity_not_found", { entity: c.entity }))}</div></ha-card>`;
       return;
     }
 
@@ -495,7 +661,7 @@ class CustomizableAlarmCard extends HTMLElement {
     let since = "";
     if (c.show_last_change !== false) {
       const by = this._changedBy();
-      since = formatSince(st.last_changed) + (by ? ` · par ${by}` : "");
+      since = formatSince(st.last_changed) + (by ? t("by", { name: by }) : "");
     }
 
     const chips = (c.info || []).map((item, i) => this._renderChip(item, i)).join("");
@@ -509,7 +675,7 @@ class CustomizableAlarmCard extends HTMLElement {
           <div class="hero-main">
             <div class="shield"><ha-icon icon="${info.icon}"></ha-icon></div>
             <div class="hero-text">
-              <div class="title">${esc(c.name || st.attributes.friendly_name)}</div>
+              <div class="title">${esc((c.name ?? t("default_name")) || st.attributes.friendly_name)}</div>
               <div class="state">${esc(info.label)}</div>
               ${since ? `<div class="since">${esc(since)}</div>` : ""}
             </div>
@@ -539,7 +705,7 @@ class CustomizableAlarmCard extends HTMLElement {
     if (TOGGLE_DOMAINS.includes(domain)) {
       const on = st.state === "on";
       icon = icon || (on ? "mdi:toggle-switch" : "mdi:toggle-switch-off-outline");
-      value = on ? "Activé" : "Désactivé";
+      value = t(on ? "on" : "off");
       cls = on ? "on" : "";
       action = "toggle";
     } else if (st.attributes.device_class === "battery" && !isNaN(parseFloat(st.state))) {
@@ -577,13 +743,13 @@ class CustomizableAlarmCard extends HTMLElement {
         ${img ? `<div class="img" style="background-image: url('${img}')"></div>` : ""}
         <div class="shade"></div>
         <div class="mode-icon"><ha-icon icon="${esc(icon)}"></ha-icon></div>
-        ${active ? `<div class="badge"><ha-icon icon="mdi:check-circle"></ha-icon>Actif</div>` : ""}
+        ${active ? `<div class="badge"><ha-icon icon="mdi:check-circle"></ha-icon>${t("active")}</div>` : ""}
         ${pending ? `<div class="spinner"></div>` : ""}
         <div class="mode-text">
-          <div class="mode-name">${esc(mode.name || (STATE_INFO[mode.state] || {}).label || "Mode")}</div>
+          <div class="mode-name">${esc(mode.name || (STATE_INFO[mode.state] || {}).label || t("mode"))}</div>
           ${mode.label ? `<div class="mode-label">${esc(mode.label)}</div>` : ""}
         </div>
-        ${confirming ? `<div class="confirm">Touchez à nouveau pour confirmer</div>` : ""}
+        ${confirming ? `<div class="confirm">${t("tap_to_confirm")}</div>` : ""}
       </button>`;
   }
 
@@ -597,7 +763,7 @@ class CustomizableAlarmCard extends HTMLElement {
       <div class="camera ${priv ? "private" : ""}" data-action="more-info" data-entity="${esc(c.camera_entity)}">
         <img alt="" onerror="this.style.visibility='hidden'" onload="this.style.visibility='visible'" />
         <div class="cam-label">${priv ? "" : `<span class="live-dot"></span>`}${esc(c.camera_name || cam.attributes.friendly_name)}</div>
-        ${priv ? `<div class="private-msg"><div><ha-icon icon="mdi:eye-off-outline"></ha-icon>Mode privé activé</div></div>` : ""}
+        ${priv ? `<div class="private-msg"><div><ha-icon icon="mdi:eye-off-outline"></ha-icon>${t("privacy_on")}</div></div>` : ""}
       </div>`;
   }
 
@@ -614,10 +780,10 @@ class CustomizableAlarmCard extends HTMLElement {
     return `
       <div class="keypad-overlay" data-action="keypad-bg">
         <div class="keypad">
-          <div class="keypad-title">Code pour « ${esc(mode?.name || "")} »</div>
+          <div class="keypad-title">${esc(t("code_for", { name: mode?.name || "" }))}</div>
           <div class="dots">${'<span class="dot"></span>'.repeat(len)}</div>
           <div class="keys">${keys}</div>
-          <button class="key" style="width:100%;margin-top:10px;font-size:14px" data-action="key" data-key="cancel">Annuler</button>
+          <button class="key" style="width:100%;margin-top:10px;font-size:14px" data-action="key" data-key="cancel">${t("cancel")}</button>
         </div>
       </div>`;
   }
@@ -721,7 +887,7 @@ class CustomizableAlarmCard extends HTMLElement {
         await this._hass.callService(call[0], call[1], { entity_id: mode.entity });
       } else {
         const service = SERVICE_FOR_STATE[mode.state];
-        if (!service) throw new Error(`Aucune action pour l'état ${mode.state}`);
+        if (!service) throw new Error(t("no_action", { state: mode.state }));
         const data = { entity_id: this._config.entity };
         if (code) data.code = code;
         await this._hass.callService("alarm_control_panel", service, data);
@@ -729,7 +895,7 @@ class CustomizableAlarmCard extends HTMLElement {
     } catch (err) {
       this._pending = null;
       this._rerender();
-      this._fire("hass-notification", { message: `Alarme : ${err.message || err}` });
+      this._fire("hass-notification", { message: t("alarm_error", { error: err.message || err }) });
     }
   }
 
@@ -772,30 +938,6 @@ class CustomizableAlarmCard extends HTMLElement {
 // Éditeur visuel
 // =====================================================================
 
-const LABELS = {
-  entity: "Entité alarme",
-  name: "Titre",
-  history_entity: "Entité historique (optionnelle, pour « par … »)",
-  camera_entity: "Caméra (optionnelle)",
-  camera_name: "Nom affiché de la caméra",
-  privacy_entity: "Interrupteur mode privé (floute la caméra)",
-  camera_refresh: "Rafraîchissement caméra",
-  columns: "Colonnes de modes",
-  tile_height: "Hauteur des tuiles",
-  glass: "Effet verre dépoli",
-  show_last_change: "Afficher « depuis … par … »",
-  state_colors: "Couleurs par état",
-  label: "Sous-titre",
-  state: "État d'alarme correspondant",
-  icon: "Icône",
-  image: "Image de fond (ex. /local/images/open.png)",
-  color: "Couleur",
-  confirm: "Demander une confirmation",
-  low_threshold: "Seuil batterie faible (%)",
-};
-
-const STATE_OPTIONS = MODE_STATES.map((s) => ({ value: s, label: STATE_INFO[s].label }));
-
 const GENERAL_SCHEMA = [
   { name: "entity", required: true, selector: { entity: { domain: "alarm_control_panel" } } },
   { name: "name", selector: { text: {} } },
@@ -815,7 +957,7 @@ const CAMERA_SCHEMA = [
   { name: "privacy_entity", selector: { entity: { domain: ["switch", "input_boolean"] } } },
 ];
 
-const LOOK_SCHEMA = [
+const lookSchema = () => [
   {
     type: "grid",
     name: "",
@@ -835,7 +977,7 @@ const LOOK_SCHEMA = [
   {
     type: "expandable",
     name: "state_colors",
-    title: "Couleurs par état",
+    title: t("label_state_colors"),
     icon: "mdi:palette",
     schema: Object.keys(STATE_INFO)
       .filter((s) => s !== "unknown")
@@ -843,7 +985,7 @@ const LOOK_SCHEMA = [
   },
 ];
 
-const MODE_SCHEMA = [
+const modeSchema = () => [
   {
     type: "grid",
     name: "",
@@ -852,7 +994,7 @@ const MODE_SCHEMA = [
       { name: "label", selector: { text: {} } },
     ],
   },
-  { name: "state", selector: { select: { mode: "dropdown", options: STATE_OPTIONS } } },
+  { name: "state", selector: { select: { mode: "dropdown", options: MODE_STATES.map((s) => ({ value: s, label: STATE_INFO[s].label })) } } },
   {
     name: "entity",
     selector: { entity: { domain: ["scene", "script", "button", "input_button", "automation", "switch", "input_boolean"] } },
@@ -881,12 +1023,6 @@ const INFO_SCHEMA = [
   },
   { name: "low_threshold", selector: { number: { min: 1, max: 100, mode: "box", unit_of_measurement: "%" } } },
 ];
-
-const MODE_HELPERS = {
-  entity:
-    "Scène, script ou bouton à lancer. Laisser vide pour piloter directement l'alarme selon l'état choisi.",
-  state: "La tuile s'affiche « Active » quand l'alarme est dans cet état.",
-};
 
 const EDITOR_STYLES = `
   :host { display: block; }
@@ -982,6 +1118,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    setLang(hass);
     this.shadowRoot.querySelectorAll("ha-form").forEach((f) => (f.hass = hass));
   }
 
@@ -1008,7 +1145,8 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
   }
 
-  _computeLabel = (schema) => LABELS[schema.name] ?? STATE_INFO[schema.name]?.label ?? schema.name;
+  _computeLabel = (schema) =>
+    (STRINGS.en[`label_${schema.name}`] ? t(`label_${schema.name}`) : STATE_INFO[schema.name]?.label ?? schema.name);
 
   _clean(obj) {
     const out = {};
@@ -1046,7 +1184,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     form.schema = schema;
     form.data = data;
     form.computeLabel = this._computeLabel;
-    if (helpers) form.computeHelper = (s) => helpers[s.name];
+    if (helpers) form.computeHelper = (s) => (helpers.includes(s.name) ? t(`helper_${s.name}`) : undefined);
     form.addEventListener("value-changed", (ev) => {
       ev.stopPropagation();
       onChange(ev.detail.value);
@@ -1082,27 +1220,27 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     root.innerHTML = `
       <style>${EDITOR_STYLES}</style>
       <div class="section">
-        <div class="section-title"><ha-icon icon="mdi:shield-home"></ha-icon>Général</div>
+        <div class="section-title"><ha-icon icon="mdi:shield-home"></ha-icon>${t("section_general")}</div>
         <div id="general-slot"></div>
       </div>
       <div class="section">
-        <div class="section-title"><ha-icon icon="mdi:view-grid"></ha-icon>Modes d'armement</div>
-        <div class="hint">Chaque mode est une tuile cliquable. Touchez une ligne pour la déplier.</div>
+        <div class="section-title"><ha-icon icon="mdi:view-grid"></ha-icon>${t("section_modes")}</div>
+        <div class="hint">${t("hint_modes")}</div>
         <div id="modes"></div>
-        <button class="add" data-add="modes"><ha-icon icon="mdi:plus"></ha-icon>Ajouter un mode</button>
+        <button class="add" data-add="modes"><ha-icon icon="mdi:plus"></ha-icon>${t("add_mode")}</button>
       </div>
       <div class="section">
-        <div class="section-title"><ha-icon icon="mdi:information-outline"></ha-icon>Informations (pastilles)</div>
-        <div class="hint">Batteries, interrupteurs (mode privé…), capteurs. Les interrupteurs se basculent d'un tap.</div>
+        <div class="section-title"><ha-icon icon="mdi:information-outline"></ha-icon>${t("section_info")}</div>
+        <div class="hint">${t("hint_info")}</div>
         <div id="info"></div>
-        <button class="add" data-add="info"><ha-icon icon="mdi:plus"></ha-icon>Ajouter une information</button>
+        <button class="add" data-add="info"><ha-icon icon="mdi:plus"></ha-icon>${t("add_info")}</button>
       </div>
       <div class="section">
-        <div class="section-title"><ha-icon icon="mdi:cctv"></ha-icon>Caméra</div>
+        <div class="section-title"><ha-icon icon="mdi:cctv"></ha-icon>${t("section_camera")}</div>
         <div id="camera-slot"></div>
       </div>
       <div class="section">
-        <div class="section-title"><ha-icon icon="mdi:palette-outline"></ha-icon>Apparence</div>
+        <div class="section-title"><ha-icon icon="mdi:palette-outline"></ha-icon>${t("section_look")}</div>
         <div id="look-slot"></div>
       </div>
     `;
@@ -1115,7 +1253,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     camera.id = "camera";
     root.getElementById("camera-slot").appendChild(camera);
 
-    const look = this._makeForm(LOOK_SCHEMA, this._lookData(), (v) => {
+    const look = this._makeForm(lookSchema(), this._lookData(), (v) => {
       const next = { ...this._config, ...v, state_colors: this._clean(v.state_colors || {}) };
       this._emit(this._clean(next));
     });
@@ -1142,9 +1280,9 @@ class CustomizableAlarmCardEditor extends HTMLElement {
         <div class="item-head">
           <div class="swatch"><ha-icon></ha-icon></div>
           <div class="item-title"><div class="t"></div><div class="s"></div></div>
-          <button class="icon-btn" data-move="-1" title="Monter" ${i === 0 ? "disabled" : ""}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
-          <button class="icon-btn" data-move="1" title="Descendre" ${i === items.length - 1 ? "disabled" : ""}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
-          <button class="icon-btn del" data-del title="Supprimer"><ha-icon icon="mdi:delete-outline"></ha-icon></button>
+          <button class="icon-btn" data-move="-1" title="${t("move_up")}" ${i === 0 ? "disabled" : ""}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
+          <button class="icon-btn" data-move="1" title="${t("move_down")}" ${i === items.length - 1 ? "disabled" : ""}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
+          <button class="icon-btn del" data-del title="${t("delete")}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>
           <ha-icon icon="${open ? "mdi:chevron-up" : "mdi:chevron-down"}" style="color: var(--secondary-text-color)"></ha-icon>
         </div>
       `;
@@ -1166,7 +1304,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
         body.className = "item-body";
         const isMode = kind === "modes";
         const form = this._makeForm(
-          isMode ? MODE_SCHEMA : INFO_SCHEMA,
+          isMode ? modeSchema() : INFO_SCHEMA,
           isMode ? this._formData(item, ["color"]) : item,
           (v) => {
             const list = [...(this._config[kind] || [])];
@@ -1174,7 +1312,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
             this._emit({ ...this._config, [kind]: list });
             isMode ? this._updateModeHead(i) : this._updateInfoHead(i);
           },
-          isMode ? MODE_HELPERS : null
+          isMode ? ["entity", "state"] : null
         );
         form.id = `${isMode ? "mode" : "info"}-${i}`;
         body.appendChild(form);
@@ -1203,7 +1341,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
       : "";
     swatch.querySelector("ha-icon").setAttribute("icon", m.icon || info.icon);
     el.querySelector(".t").textContent = m.name || info.label;
-    const target = m.entity ? (this._hass?.states[m.entity]?.attributes.friendly_name || m.entity) : "action directe sur l'alarme";
+    const target = m.entity ? (this._hass?.states[m.entity]?.attributes.friendly_name || m.entity) : t("direct_action");
     el.querySelector(".s").textContent = `${m.state ? info.label : "—"} · ${target}`;
   }
 
@@ -1215,8 +1353,8 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     const swatch = el.querySelector(".swatch");
     swatch.style.backgroundColor = "var(--primary-color)";
     swatch.querySelector("ha-icon").setAttribute("icon", it.icon || st?.attributes.icon || "mdi:information-outline");
-    el.querySelector(".t").textContent = it.name || st?.attributes.friendly_name || it.entity || "Nouvelle information";
-    el.querySelector(".s").textContent = it.entity || "Choisissez une entité";
+    el.querySelector(".t").textContent = it.name || st?.attributes.friendly_name || it.entity || t("new_info");
+    el.querySelector(".s").textContent = it.entity || t("choose_entity");
   }
 
   _addItem(kind) {
@@ -1266,7 +1404,7 @@ if (!window.customCards.some((c) => c.type === "customizable-alarm-card")) {
   window.customCards.push({
     type: "customizable-alarm-card",
     name: "Customizable Alarm Card",
-    description: "Pilotage de l'alarme : état, modes illustrés, batteries, mode privé et caméra.",
+    description: t("card_description"),
     preview: true,
     documentationURL: "https://github.com/Ergorock/customizable-alarm-card",
   });
