@@ -12,6 +12,12 @@ Lovelace card to control an `alarm_control_panel` alarm, with a full visual edit
 - **Visual editor**: General / Modes / Information / Camera / Appearance sections, add, remove and reorder modes and chips, colors by state.
 - Interface in English and French (follows the Home Assistant language).
 
+## Screenshots
+
+![Alarm card](https://raw.githubusercontent.com/Ergorock/customizable-alarm-card/main/images/card.png)
+
+![Visual editor](https://raw.githubusercontent.com/Ergorock/customizable-alarm-card/main/images/editor.png)
+
 ## Installation
 
 ### HACS (custom repository)

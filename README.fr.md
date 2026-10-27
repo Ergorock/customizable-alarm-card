@@ -13,6 +13,12 @@ Carte Lovelace pour piloter une alarme `alarm_control_panel`, avec un éditeur v
 
 L'interface est disponible en français et en anglais (elle suit la langue de Home Assistant).
 
+## Captures d'écran
+
+![Carte d'alarme](https://raw.githubusercontent.com/Ergorock/customizable-alarm-card/main/images/card.png)
+
+![Éditeur visuel](https://raw.githubusercontent.com/Ergorock/customizable-alarm-card/main/images/editor.png)
+
 ## Installation
 
 ### HACS (dépôt personnalisé)
