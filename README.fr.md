@@ -83,10 +83,12 @@ info:
 | `name` | Titre du bandeau | `Alarme` |
 | `history_entity` | Entité dont l'attribut `user` sert à afficher « par … » | |
 | `show_last_change` | Affiche « depuis … par … » | `true` |
-| `camera_entity` | Caméra affichée sous le bandeau | |
+| `camera_entity` | Caméra unique (conservée pour compatibilité, équivaut à un élément de `cameras`) | |
 | `camera_name` | Nom affiché sur l'aperçu | nom de l'entité |
 | `camera_refresh` | Rafraîchissement de l'image (s) | `10` |
-| `privacy_entity` | Interrupteur qui floute l'aperçu quand il est `on` | |
+| `privacy_entity` | Interrupteur qui floute l'aperçu quand il est `on` (caméra unique, conservée pour compatibilité) | |
+| `cameras` | Liste de caméras, chacune avec `entity`, `name` et son propre `privacy_entity`. Un aperçu par caméra | |
+| `visits_calendar` | Calendrier des passages prévus (voir ci-dessous). La section est masquée si non renseignée | |
 | `columns` | Nombre de colonnes de tuiles (2 max sous 520 px de large) | `3` |
 | `tile_height` | Hauteur des tuiles (px) | `150` |
 | `glass` | Fond verre dépoli | `true` |
@@ -95,3 +97,14 @@ info:
 | `info` | Liste des pastilles : `entity`, `name`, `icon`, `low_threshold` (batteries) | |
 
 **Mode** : `name`, `label` (sous-titre), `state` (état d'alarme qui rend la tuile « Active »), `entity` (scène / script / bouton à lancer ; vide = appel direct `alarm_control_panel.alarm_*`), `icon`, `image`, `color`, `confirm` (demande un second tap).
+
+## Passages prévus
+
+Pour désarmer l'alarme pendant qu'une personne passe à une heure connue, puis la réarmer à son départ.
+
+1. Créer un calendrier **Local Calendar** nommé *Alarme* (Paramètres → Appareils et services → Ajouter une intégration → Local Calendar).
+2. Créer un helper `input_text` nommé `alarme_mode_avant_passage` (longueur max 255). Il retient le mode avant le passage.
+3. Importer le blueprint [alarm_planned_visit.yaml](https://github.com/Ergorock/customizable-alarm-card/blob/main/blueprints/automation/alarm_planned_visit.yaml) (Paramètres → Automatisations → Blueprints → Importer), puis créer une automatisation à partir de lui avec le calendrier, l'alarme et le helper.
+4. Renseigner `visits_calendar` dans la carte. La carte affiche alors les prochains passages et permet d'en ajouter un (titre, date, début, fin).
+
+Au début d'un passage, l'alarme est désarmée. À la fin, elle est réarmée dans le mode qu'elle avait avant, uniquement si elle est toujours désarmée. Rien ne se passe si elle était déjà désarmée au début, ou si elle a été changée à la main pendant le passage.
