@@ -236,6 +236,15 @@ function toRgb(value, fallback) {
 const darken = (rgb, f = 0.72) => rgb.map((c) => Math.round(c * f));
 const rgbVar = (rgb) => rgb.join(", ");
 
+/** Liste de caméras : `cameras`, ou l'ancienne option `camera_entity` transformée en liste d'une caméra. */
+export function normalizeCameras(config) {
+  if (Array.isArray(config.cameras)) return config.cameras.filter((c) => c.entity);
+  if (config.camera_entity) {
+    return [{ entity: config.camera_entity, name: config.camera_name, privacy_entity: config.privacy_entity }];
+  }
+  return [];
+}
+
 function batteryIcon(level) {
   if (isNaN(level)) return "mdi:battery-unknown";
   if (level >= 95) return "mdi:battery";
@@ -384,6 +393,8 @@ const STYLES = `
     text-align: center;
   }
   .camera .private-msg ha-icon { --mdc-icon-size: 36px; display: block; margin: 0 auto 6px; }
+  .cameras { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .cameras.multi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   /* ---------- Modes ---------- */
   .modes { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 12px; }
@@ -521,6 +532,7 @@ const STYLES = `
   ha-card { container-type: inline-size; }
   @container (max-width: 520px) {
     .modes { grid-template-columns: repeat(min(var(--cols), 2), minmax(0, 1fr)); }
+    .cameras.multi { grid-template-columns: minmax(0, 1fr); }
     .state { font-size: 20px; }
   }
 `;
@@ -550,6 +562,7 @@ class CustomizableAlarmCard extends HTMLElement {
       throw new Error(t("no_entity"));
     }
     this._config = { ...DEFAULTS, ...config };
+    this._cameras = normalizeCameras(this._config);
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
@@ -586,7 +599,7 @@ class CustomizableAlarmCard extends HTMLElement {
   getCardSize() {
     const modes = (this._config?.modes || []).length;
     const rows = Math.ceil(modes / (this._config?.columns || 3));
-    return 3 + rows * 3 + (this._config?.camera_entity ? 4 : 0);
+    return 3 + rows * 3 + 4 * (this._cameras?.length || 0);
   }
 
   getGridOptions() {
@@ -600,8 +613,7 @@ class CustomizableAlarmCard extends HTMLElement {
     return [
       c.entity,
       c.history_entity,
-      c.camera_entity,
-      c.privacy_entity,
+      ...(this._cameras || []).flatMap((cam) => [cam.entity, cam.privacy_entity]),
       ...(c.info || []).map((i) => i.entity),
       ...(c.modes || []).map((m) => m.entity),
     ].filter(Boolean);
@@ -682,7 +694,7 @@ class CustomizableAlarmCard extends HTMLElement {
           </div>
           ${chips ? `<div class="chips">${chips}</div>` : ""}
         </div>
-        ${this._renderCamera()}
+        ${this._renderCameras()}
         ${modes ? `<div class="modes">${modes}</div>` : ""}
         ${this._keypad ? this._renderKeypad() : ""}
       </ha-card>
@@ -753,16 +765,21 @@ class CustomizableAlarmCard extends HTMLElement {
       </button>`;
   }
 
-  _renderCamera() {
-    const c = this._config;
-    if (!c.camera_entity) return "";
-    const cam = this._hass.states[c.camera_entity];
-    if (!cam) return "";
+  _renderCameras() {
+    const cams = this._cameras || [];
+    if (!cams.length) return "";
+    const cells = cams.map((c) => this._renderCamera(c)).join("");
+    return `<div class="cameras ${cams.length > 1 ? "multi" : ""}">${cells}</div>`;
+  }
+
+  _renderCamera(c) {
+    const cam = this._hass.states[c.entity];
     const priv = c.privacy_entity && this._hass.states[c.privacy_entity]?.state === "on";
+    const name = c.name || cam?.attributes.friendly_name || c.entity;
     return `
-      <div class="camera ${priv ? "private" : ""}" data-action="more-info" data-entity="${esc(c.camera_entity)}">
-        <img alt="" onerror="this.style.visibility='hidden'" onload="this.style.visibility='visible'" />
-        <div class="cam-label">${priv ? "" : `<span class="live-dot"></span>`}${esc(c.camera_name || cam.attributes.friendly_name)}</div>
+      <div class="camera ${priv ? "private" : ""}" data-action="more-info" data-entity="${esc(c.entity)}">
+        ${cam ? `<img alt="" data-entity="${esc(c.entity)}" onerror="this.style.visibility='hidden'" onload="this.style.visibility='visible'" />` : ""}
+        <div class="cam-label">${priv || !cam ? "" : `<span class="live-dot"></span>`}${cam ? esc(name) : "? " + esc(c.entity)}</div>
         ${priv ? `<div class="private-msg"><div><ha-icon icon="mdi:eye-off-outline"></ha-icon>${t("privacy_on")}</div></div>` : ""}
       </div>`;
   }
@@ -797,11 +814,11 @@ class CustomizableAlarmCard extends HTMLElement {
   }
 
   _updateCameraImage() {
-    const img = this.shadowRoot?.querySelector(".camera img");
-    const cam = this._config?.camera_entity && this._hass?.states[this._config.camera_entity];
-    if (!img || !cam?.attributes.entity_picture) return;
-    const url = cam.attributes.entity_picture;
-    img.src = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+    this.shadowRoot?.querySelectorAll(".camera img[data-entity]").forEach((img) => {
+      const url = this._hass?.states[img.dataset.entity]?.attributes.entity_picture;
+      if (!url) return;
+      img.src = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+    });
   }
 
   // ---------- Interactions ----------
