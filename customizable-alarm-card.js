@@ -74,6 +74,9 @@ const STRINGS = {
     hint_info: "Batteries, switches (privacy mode…), sensors. Switches toggle with a tap.",
     add_info: "Add an information chip",
     section_camera: "Camera",
+    hint_cameras: "One preview per camera. Each camera can have its own privacy switch.",
+    add_camera: "Add a camera",
+    new_camera: "New camera",
     section_look: "Appearance",
     move_up: "Move up",
     move_down: "Move down",
@@ -148,6 +151,9 @@ const STRINGS = {
     hint_info: "Batteries, interrupteurs (mode privé…), capteurs. Les interrupteurs se basculent d'un tap.",
     add_info: "Ajouter une information",
     section_camera: "Caméra",
+    hint_cameras: "Un aperçu par caméra. Chaque caméra peut avoir son propre interrupteur de mode privé.",
+    add_camera: "Ajouter une caméra",
+    new_camera: "Nouvelle caméra",
     section_look: "Apparence",
     move_up: "Monter",
     move_down: "Descendre",
@@ -243,6 +249,13 @@ export function normalizeCameras(config) {
     return [{ entity: config.camera_entity, name: config.camera_name, privacy_entity: config.privacy_entity }];
   }
   return [];
+}
+
+/** Transforme les anciennes options caméra unique en liste `cameras`. */
+export function migrateLegacyCamera(config) {
+  if (!config.camera_entity || config.cameras) return config;
+  const { camera_entity, camera_name, privacy_entity, ...rest } = config;
+  return { ...rest, cameras: [{ entity: camera_entity, name: camera_name, privacy_entity }] };
 }
 
 function batteryIcon(level) {
@@ -961,17 +974,14 @@ const GENERAL_SCHEMA = [
   { name: "history_entity", selector: { entity: { domain: ["text", "sensor"] } } },
 ];
 
-const CAMERA_SCHEMA = [
-  { name: "camera_entity", selector: { entity: { domain: "camera" } } },
-  {
-    type: "grid",
-    name: "",
-    schema: [
-      { name: "camera_name", selector: { text: {} } },
-      { name: "camera_refresh", selector: { number: { min: 2, max: 120, mode: "box", unit_of_measurement: "s" } } },
-    ],
-  },
+const CAMERA_ITEM_SCHEMA = [
+  { name: "entity", required: true, selector: { entity: { domain: "camera" } } },
+  { name: "name", selector: { text: {} } },
   { name: "privacy_entity", selector: { entity: { domain: ["switch", "input_boolean"] } } },
+];
+
+const CAMERA_GLOBAL_SCHEMA = [
+  { name: "camera_refresh", selector: { number: { min: 2, max: 120, mode: "box", unit_of_measurement: "s" } } },
 ];
 
 const lookSchema = () => [
@@ -1120,10 +1130,14 @@ class CustomizableAlarmCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._open = { modes: new Set(), info: new Set() };
+    this._open = { modes: new Set(), info: new Set(), cameras: new Set() };
   }
 
   setConfig(config) {
+    if (config.camera_entity && !config.cameras) {
+      config = migrateLegacyCamera(config);
+      this._emit(config);
+    }
     const json = JSON.stringify(config);
     this._config = JSON.parse(json);
     if (this._rendered && json === this._lastSent) {
@@ -1217,7 +1231,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
       if (f) f.data = data;
     };
     set("general", c);
-    set("camera", c);
+    set("camera-global", c);
     set("look", this._lookData());
     (c.modes || []).forEach((m, i) => {
       set(`mode-${i}`, this._formData(m, ["color"]));
@@ -1226,6 +1240,10 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     (c.info || []).forEach((it, i) => {
       set(`info-${i}`, it);
       this._updateInfoHead(i);
+    });
+    (c.cameras || []).forEach((cam, i) => {
+      set(`camera-${i}`, cam);
+      this._updateCameraHead(i);
     });
   }
 
@@ -1254,7 +1272,10 @@ class CustomizableAlarmCardEditor extends HTMLElement {
       </div>
       <div class="section">
         <div class="section-title"><ha-icon icon="mdi:cctv"></ha-icon>${t("section_camera")}</div>
+        <div class="hint">${t("hint_cameras")}</div>
         <div id="camera-slot"></div>
+        <div id="cameras"></div>
+        <button class="add" data-add="cameras"><ha-icon icon="mdi:plus"></ha-icon>${t("add_camera")}</button>
       </div>
       <div class="section">
         <div class="section-title"><ha-icon icon="mdi:palette-outline"></ha-icon>${t("section_look")}</div>
@@ -1266,9 +1287,9 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     general.id = "general";
     root.getElementById("general-slot").appendChild(general);
 
-    const camera = this._makeForm(CAMERA_SCHEMA, c, (v) => this._emit(this._clean({ ...this._config, ...v })));
-    camera.id = "camera";
-    root.getElementById("camera-slot").appendChild(camera);
+    const cameraGlobal = this._makeForm(CAMERA_GLOBAL_SCHEMA, c, (v) => this._emit(this._clean({ ...this._config, ...v })));
+    cameraGlobal.id = "camera-global";
+    root.getElementById("camera-slot").appendChild(cameraGlobal);
 
     const look = this._makeForm(lookSchema(), this._lookData(), (v) => {
       const next = { ...this._config, ...v, state_colors: this._clean(v.state_colors || {}) };
@@ -1279,6 +1300,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
 
     this._renderList("modes");
     this._renderList("info");
+    this._renderList("cameras");
 
     root.querySelectorAll("[data-add]").forEach((btn) =>
       btn.addEventListener("click", () => this._addItem(btn.dataset.add))
@@ -1320,25 +1342,44 @@ class CustomizableAlarmCardEditor extends HTMLElement {
         const body = document.createElement("div");
         body.className = "item-body";
         const isMode = kind === "modes";
+        const schema = isMode ? modeSchema() : kind === "cameras" ? CAMERA_ITEM_SCHEMA : INFO_SCHEMA;
         const form = this._makeForm(
-          isMode ? modeSchema() : INFO_SCHEMA,
+          schema,
           isMode ? this._formData(item, ["color"]) : item,
           (v) => {
             const list = [...(this._config[kind] || [])];
             list[i] = this._clean(v);
             this._emit({ ...this._config, [kind]: list });
-            isMode ? this._updateModeHead(i) : this._updateInfoHead(i);
+            this._updateHead(kind, i);
           },
           isMode ? ["entity", "state"] : null
         );
-        form.id = `${isMode ? "mode" : "info"}-${i}`;
+        form.id = `${{ modes: "mode", info: "info", cameras: "camera" }[kind]}-${i}`;
         body.appendChild(form);
         wrap.appendChild(body);
       }
       wrap.dataset.index = i;
       container.appendChild(wrap);
-      kind === "modes" ? this._updateModeHead(i) : this._updateInfoHead(i);
+      this._updateHead(kind, i);
     });
+  }
+
+  _updateHead(kind, i) {
+    if (kind === "modes") this._updateModeHead(i);
+    else if (kind === "cameras") this._updateCameraHead(i);
+    else this._updateInfoHead(i);
+  }
+
+  _updateCameraHead(i) {
+    const el = this._itemEl("cameras", i);
+    const cam = (this._config.cameras || [])[i];
+    if (!el || !cam) return;
+    const st = cam.entity ? this._hass?.states[cam.entity] : undefined;
+    const swatch = el.querySelector(".swatch");
+    swatch.style.backgroundColor = "var(--primary-color)";
+    swatch.querySelector("ha-icon").setAttribute("icon", "mdi:cctv");
+    el.querySelector(".t").textContent = cam.name || st?.attributes.friendly_name || cam.entity || t("new_camera");
+    el.querySelector(".s").textContent = cam.entity || t("choose_entity");
   }
 
   _itemEl(kind, i) {
