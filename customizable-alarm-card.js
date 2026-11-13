@@ -77,6 +77,19 @@ const STRINGS = {
     hint_cameras: "One preview per camera. Each camera can have its own privacy switch.",
     add_camera: "Add a camera",
     new_camera: "New camera",
+    visits_title: "Planned visits",
+    add_visit: "Add a visit",
+    visits_error: "Calendar unavailable",
+    visits_empty: "No planned visits",
+    visit_default_name: "Visit",
+    visit_title: "Title",
+    visit_date: "Date",
+    visit_start: "Start",
+    visit_end: "End",
+    visit_save: "Save",
+    visit_cancel: "Cancel",
+    visit_invalid: "The end must be after the start",
+    visit_no_end: "—",
     section_look: "Appearance",
     move_up: "Move up",
     move_down: "Move down",
@@ -154,6 +167,19 @@ const STRINGS = {
     hint_cameras: "Un aperçu par caméra. Chaque caméra peut avoir son propre interrupteur de mode privé.",
     add_camera: "Ajouter une caméra",
     new_camera: "Nouvelle caméra",
+    visits_title: "Passages prévus",
+    add_visit: "Ajouter un passage",
+    visits_error: "Calendrier indisponible",
+    visits_empty: "Aucun passage prévu",
+    visit_default_name: "Passage",
+    visit_title: "Titre",
+    visit_date: "Date",
+    visit_start: "Début",
+    visit_end: "Fin",
+    visit_save: "Enregistrer",
+    visit_cancel: "Annuler",
+    visit_invalid: "La fin doit être après le début",
+    visit_no_end: "—",
     section_look: "Apparence",
     move_up: "Monter",
     move_down: "Descendre",
@@ -270,6 +296,14 @@ export function toVisits(events, limit = 5) {
 export function formatHaDateTime(date) {
   const p = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+}
+
+/** Plage saisie dans le formulaire → format calendar ; null si la fin n'est pas après le début. */
+export function visitRange({ date, start, end }) {
+  if (!date || !start || !end) return null;
+  const s = `${date} ${start}:00`;
+  const e = `${date} ${end}:00`;
+  return e > s ? { start: s, end: e } : null;
 }
 
 function batteryIcon(level) {
@@ -420,6 +454,26 @@ const STYLES = `
     text-align: center;
   }
   .camera .private-msg ha-icon { --mdc-icon-size: 36px; display: block; margin: 0 auto 6px; }
+  .visits { display: flex; flex-direction: column; gap: 8px; }
+  .visits-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 14px; }
+  .visit { border-radius: 12px; padding: 10px 12px; background: rgba(255, 255, 255, 0.16); }
+  .visit.now { background: rgba(255, 255, 255, 0.34); box-shadow: inset 3px 0 0 #fff; }
+  .visit-title { font-weight: 600; }
+  .visit-when { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .visits-empty, .visits-error { font-size: 13px; opacity: 0.85; padding: 4px 2px; }
+  .visits-error { color: #ffd2d2; }
+  .visit-btn {
+    display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.16); color: #fff;
+    font-family: inherit; font-size: 13px; cursor: pointer;
+  }
+  .visit-btn ha-icon { --mdc-icon-size: 16px; }
+  .visit-btn.primary { background: #fff; color: rgb(var(--accent-dark)); }
+  .visit-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.2); font-size: 13px; }
+  .visit-form label { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+  .visit-form input { font: inherit; padding: 6px 8px; border-radius: 8px; border: none; min-width: 0; width: 100%; box-sizing: border-box; }
+  .visit-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .visit-actions { display: flex; justify-content: flex-end; gap: 8px; }
   .cameras { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .cameras.multi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
@@ -590,6 +644,7 @@ class CustomizableAlarmCard extends HTMLElement {
     }
     this._config = { ...DEFAULTS, ...config };
     this._cameras = normalizeCameras(this._config);
+    this._visitsLoaded = false;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
@@ -602,6 +657,10 @@ class CustomizableAlarmCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     setLang(hass);
+    if (!this._visitsLoaded && this._config?.visits_calendar) {
+      this._visitsLoaded = true;
+      this._refreshVisits();
+    }
     if (this._pending && this._config) {
       const state = hass.states[this._config.entity]?.state;
       const target = this._config.modes?.[this._pending.index]?.state;
@@ -616,11 +675,13 @@ class CustomizableAlarmCard extends HTMLElement {
 
   connectedCallback() {
     this._startCamera();
+    this._visitsTimer = setInterval(() => this._refreshVisits(), 5 * 60 * 1000);
   }
 
   disconnectedCallback() {
     clearInterval(this._camTimer);
     this._camTimer = null;
+    clearInterval(this._visitsTimer);
   }
 
   getCardSize() {
@@ -701,6 +762,35 @@ class CustomizableAlarmCard extends HTMLElement {
     });
   }
 
+  async _refreshVisits() {
+    if (!this._config?.visits_calendar || !this._hass) return;
+    this._visits = await this._loadVisits();
+    this._rerender();
+  }
+
+  _newVisitForm() {
+    const now = new Date();
+    const hour = (h) => `${String((now.getHours() + h) % 24).padStart(2, "0")}:00`;
+    return { summary: "", date: formatHaDateTime(now).slice(0, 10), start: hour(1), end: hour(2) };
+  }
+
+  async _saveVisit() {
+    const read = (k) => this.shadowRoot.querySelector(`[data-field="${k}"]`).value;
+    const form = { summary: read("summary"), date: read("date"), start: read("start"), end: read("end") };
+    const range = visitRange(form);
+    if (!range) {
+      this._visitForm = { ...form, error: t("visit_invalid") };
+      return this._rerender();
+    }
+    this._visitForm = null;
+    try {
+      await this._createVisit({ summary: form.summary || t("visit_default_name"), ...range });
+    } catch (err) {
+      this._fire("hass-notification", { message: err.message || String(err) });
+    }
+    await this._refreshVisits();
+  }
+
   // ---------- Rendu ----------
 
   _render() {
@@ -753,6 +843,7 @@ class CustomizableAlarmCard extends HTMLElement {
         </div>
         ${this._renderCameras()}
         ${modes ? `<div class="modes">${modes}</div>` : ""}
+        ${this._renderVisits()}
         ${this._keypad ? this._renderKeypad() : ""}
       </ha-card>
     `;
@@ -841,6 +932,55 @@ class CustomizableAlarmCard extends HTMLElement {
       </div>`;
   }
 
+  _renderVisits() {
+    if (!this._config.visits_calendar) return "";
+    const v = this._visits;
+    let body = "";
+    if (v && !v.ok) body = `<div class="visits-error">${esc(t("visits_error"))}</div>`;
+    else if (v && !v.visits.length) body = `<div class="visits-empty">${esc(t("visits_empty"))}</div>`;
+    else if (v) body = v.visits.map((visit) => this._renderVisit(visit)).join("");
+    const form = this._visitForm ? this._renderVisitForm(this._visitForm) : "";
+    return `
+      <div class="visits">
+        <div class="visits-head">
+          <span>${esc(t("visits_title"))}</span>
+          ${this._visitForm ? "" : `<button class="visit-btn" data-action="visit-open"><ha-icon icon="mdi:plus"></ha-icon>${esc(t("add_visit"))}</button>`}
+        </div>
+        ${body}
+        ${form}
+      </div>`;
+  }
+
+  _renderVisit(visit) {
+    const now = Date.now();
+    const current = visit.start.getTime() <= now && (!visit.end || visit.end.getTime() > now);
+    const locale = lang === "fr" ? "fr-FR" : "en";
+    const hm = (d) => d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+    const day = visit.start.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
+    return `
+      <div class="visit ${current ? "now" : ""}">
+        <div class="visit-title">${esc(visit.summary || t("visit_default_name"))}</div>
+        <div class="visit-when">${esc(day)} · ${hm(visit.start)} – ${visit.end ? hm(visit.end) : esc(t("visit_no_end"))}</div>
+      </div>`;
+  }
+
+  _renderVisitForm(f) {
+    return `
+      <div class="visit-form">
+        <label>${esc(t("visit_title"))}<input data-field="summary" value="${esc(f.summary)}" /></label>
+        <div class="visit-row">
+          <label>${esc(t("visit_date"))}<input type="date" data-field="date" value="${esc(f.date)}" /></label>
+          <label>${esc(t("visit_start"))}<input type="time" data-field="start" value="${esc(f.start)}" /></label>
+          <label>${esc(t("visit_end"))}<input type="time" data-field="end" value="${esc(f.end)}" /></label>
+        </div>
+        ${f.error ? `<div class="visits-error">${esc(f.error)}</div>` : ""}
+        <div class="visit-actions">
+          <button class="visit-btn" data-action="visit-cancel">${esc(t("visit_cancel"))}</button>
+          <button class="visit-btn primary" data-action="visit-save">${esc(t("visit_save"))}</button>
+        </div>
+      </div>`;
+  }
+
   _renderKeypad() {
     const len = (this._code || "").length;
     const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "clear", "0", "ok"]
@@ -898,6 +1038,17 @@ class CustomizableAlarmCard extends HTMLElement {
         break;
       case "key":
         this._onKey(key);
+        break;
+      case "visit-open":
+        this._visitForm = this._newVisitForm();
+        this._rerender();
+        break;
+      case "visit-cancel":
+        this._visitForm = null;
+        this._rerender();
+        break;
+      case "visit-save":
+        this._saveVisit();
         break;
       case "keypad-bg":
         if (ev.target === el) this._closeKeypad();

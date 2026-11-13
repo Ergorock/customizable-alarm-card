@@ -30,3 +30,21 @@ test("at most five visits are kept", () => {
 test("formatHaDateTime gives the YYYY-MM-DD HH:MM:SS form used by calendar services", () => {
   assert.equal(formatHaDateTime(new Date(2026, 10, 13, 9, 5, 0)), "2026-11-13 09:05:00");
 });
+
+const { visitRange } = await import("../customizable-alarm-card.js");
+
+test("form values become calendar datetimes when the end is after the start", () => {
+  assert.deepEqual(visitRange({ date: "2026-11-13", start: "09:00", end: "10:00" }), {
+    start: "2026-11-13 09:00:00",
+    end: "2026-11-13 10:00:00",
+  });
+});
+
+test("an end that is not after the start is rejected", () => {
+  assert.equal(visitRange({ date: "2026-11-13", start: "10:00", end: "10:00" }), null);
+  assert.equal(visitRange({ date: "2026-11-13", start: "10:00", end: "09:00" }), null);
+});
+
+test("a missing field is rejected", () => {
+  assert.equal(visitRange({ date: "", start: "09:00", end: "10:00" }), null);
+});
