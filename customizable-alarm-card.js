@@ -258,6 +258,20 @@ export function migrateLegacyCamera(config) {
   return { ...rest, cameras: [{ entity: camera_entity, name: camera_name, privacy_entity }] };
 }
 
+/** Passages : événements HA triés par début, les `limit` premiers ; `end` vaut null si absent. */
+export function toVisits(events, limit = 5) {
+  return events
+    .map((ev) => ({ uid: ev.uid, summary: ev.summary, start: new Date(ev.start), end: ev.end ? new Date(ev.end) : null }))
+    .sort((a, b) => a.start - b.start)
+    .slice(0, limit);
+}
+
+/** Format attendu par les services calendar : "YYYY-MM-DD HH:MM:SS", heure locale. */
+export function formatHaDateTime(date) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+}
+
 function batteryIcon(level) {
   if (isNaN(level)) return "mdi:battery-unknown";
   if (level >= 95) return "mdi:battery";
@@ -655,6 +669,36 @@ class CustomizableAlarmCard extends HTMLElement {
     if (st?.attributes.changed_by) return st.attributes.changed_by;
     const h = this._config.history_entity && this._hass.states[this._config.history_entity];
     return h?.attributes?.user || null;
+  }
+
+  // ---------- Passages (calendrier) ----------
+
+  async _loadVisits() {
+    const entity = this._config.visits_calendar;
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 86400000);
+    try {
+      const res = await this._hass.callWS({
+        type: "call_service",
+        domain: "calendar",
+        service: "get_events",
+        return_response: true,
+        target: { entity_id: entity },
+        service_data: { start_date_time: formatHaDateTime(now), end_date_time: formatHaDateTime(in30Days) },
+      });
+      return { ok: true, visits: toVisits(res.response[entity]?.events || []) };
+    } catch (err) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+
+  _createVisit({ summary, start, end }) {
+    return this._hass.callService("calendar", "create_event", {
+      entity_id: this._config.visits_calendar,
+      summary,
+      start_date_time: start,
+      end_date_time: end,
+    });
   }
 
   // ---------- Rendu ----------
