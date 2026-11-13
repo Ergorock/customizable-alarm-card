@@ -1,0 +1,58 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+globalThis.window = globalThis;
+globalThis.HTMLElement = class {};
+globalThis.customElements = { get: () => undefined, define() {}, whenDefined: async () => {} };
+
+const { toVisits, formatHaDateTime } = await import("../customizable-alarm-card.js");
+
+test("events become visits sorted by start, with end null when missing", () => {
+  const visits = toVisits([
+    { summary: "Ménage", start: "2026-11-14T10:00:00", end: "2026-11-14T12:00:00", uid: "b" },
+    { summary: "Artisan", start: "2026-11-13T09:00:00", uid: "a" },
+  ]);
+  assert.deepEqual(
+    visits.map((v) => [v.summary, v.uid, v.end]),
+    [
+      ["Artisan", "a", null],
+      ["Ménage", "b", new Date("2026-11-14T12:00:00")],
+    ],
+  );
+  assert.ok(visits[0].start instanceof Date);
+});
+
+test("at most five visits are kept", () => {
+  const events = Array.from({ length: 7 }, (_, i) => ({ summary: `v${i}`, start: `2026-11-0${i + 1}T08:00:00` }));
+  assert.equal(toVisits(events).length, 5);
+});
+
+test("formatHaDateTime gives the YYYY-MM-DD HH:MM:SS form used by calendar services", () => {
+  assert.equal(formatHaDateTime(new Date(2026, 10, 13, 9, 5, 0)), "2026-11-13 09:05:00");
+});
+
+const { visitRange } = await import("../customizable-alarm-card.js");
+
+test("form values become calendar datetimes when the end is after the start", () => {
+  assert.deepEqual(visitRange({ date: "2026-11-13", start: "09:00", end: "10:00" }), {
+    start: "2026-11-13 09:00:00",
+    end: "2026-11-13 10:00:00",
+  });
+});
+
+test("an end that is not after the start is rejected", () => {
+  assert.equal(visitRange({ date: "2026-11-13", start: "10:00", end: "10:00" }), null);
+  assert.equal(visitRange({ date: "2026-11-13", start: "10:00", end: "09:00" }), null);
+});
+
+test("a missing field is rejected", () => {
+  assert.equal(visitRange({ date: "", start: "09:00", end: "10:00" }), null);
+});
+
+test("an all-day event date is read as local midnight, not UTC", () => {
+  const [visit] = toVisits([{ summary: "Journée", start: "2026-11-14" }]);
+  assert.equal(visit.start.getFullYear(), 2026);
+  assert.equal(visit.start.getMonth(), 10);
+  assert.equal(visit.start.getDate(), 14);
+  assert.equal(visit.start.getHours(), 0);
+});

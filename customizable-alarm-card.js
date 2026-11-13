@@ -48,6 +48,7 @@ const STRINGS = {
     label_entity: "Alarm entity",
     label_name: "Title",
     label_history_entity: "History entity (optional, for “by …”)",
+    label_visits_calendar: "Visits calendar",
     label_camera_entity: "Camera (optional)",
     label_camera_name: "Camera display name",
     label_privacy_entity: "Privacy mode switch (blurs the camera)",
@@ -74,6 +75,23 @@ const STRINGS = {
     hint_info: "Batteries, switches (privacy mode…), sensors. Switches toggle with a tap.",
     add_info: "Add an information chip",
     section_camera: "Camera",
+    hint_cameras: "One preview per camera. Each camera can have its own privacy switch.",
+    add_camera: "Add a camera",
+    new_camera: "New camera",
+    visits_title: "Planned visits",
+    add_visit: "Add a visit",
+    visits_error: "Calendar unavailable",
+    visits_empty: "No planned visits",
+    visit_default_name: "Visit",
+    visit_title: "Title",
+    visit_date: "Date",
+    visit_start: "Start",
+    visit_end: "End",
+    visit_save: "Save",
+    visit_cancel: "Cancel",
+    visit_invalid: "The end must be after the start",
+    visit_no_end: "—",
+    visit_delete_confirm: "Tap again to delete",
     section_look: "Appearance",
     move_up: "Move up",
     move_down: "Move down",
@@ -122,6 +140,7 @@ const STRINGS = {
     label_entity: "Entité alarme",
     label_name: "Titre",
     label_history_entity: "Entité historique (optionnelle, pour « par … »)",
+    label_visits_calendar: "Calendrier des passages",
     label_camera_entity: "Caméra (optionnelle)",
     label_camera_name: "Nom affiché de la caméra",
     label_privacy_entity: "Interrupteur mode privé (floute la caméra)",
@@ -148,6 +167,23 @@ const STRINGS = {
     hint_info: "Batteries, interrupteurs (mode privé…), capteurs. Les interrupteurs se basculent d'un tap.",
     add_info: "Ajouter une information",
     section_camera: "Caméra",
+    hint_cameras: "Un aperçu par caméra. Chaque caméra peut avoir son propre interrupteur de mode privé.",
+    add_camera: "Ajouter une caméra",
+    new_camera: "Nouvelle caméra",
+    visits_title: "Passages prévus",
+    add_visit: "Ajouter un passage",
+    visits_error: "Calendrier indisponible",
+    visits_empty: "Aucun passage prévu",
+    visit_default_name: "Passage",
+    visit_title: "Titre",
+    visit_date: "Date",
+    visit_start: "Début",
+    visit_end: "Fin",
+    visit_save: "Enregistrer",
+    visit_cancel: "Annuler",
+    visit_invalid: "La fin doit être après le début",
+    visit_no_end: "—",
+    visit_delete_confirm: "Toucher à nouveau pour supprimer",
     section_look: "Apparence",
     move_up: "Monter",
     move_down: "Descendre",
@@ -235,6 +271,45 @@ function toRgb(value, fallback) {
 
 const darken = (rgb, f = 0.72) => rgb.map((c) => Math.round(c * f));
 const rgbVar = (rgb) => rgb.join(", ");
+
+/** Liste de caméras : `cameras`, ou l'ancienne option `camera_entity` transformée en liste d'une caméra. */
+export function normalizeCameras(config) {
+  if (Array.isArray(config.cameras)) return config.cameras.filter((c) => c.entity);
+  if (config.camera_entity) {
+    return [{ entity: config.camera_entity, name: config.camera_name, privacy_entity: config.privacy_entity }];
+  }
+  return [];
+}
+
+/** Transforme les anciennes options caméra unique en liste `cameras`. */
+export function migrateLegacyCamera(config) {
+  if (!config.camera_entity || config.cameras) return config;
+  const { camera_entity, camera_name, privacy_entity, ...rest } = config;
+  return { ...rest, cameras: [{ entity: camera_entity, name: camera_name, privacy_entity }] };
+}
+
+/** Passages : événements HA triés par début, les `limit` premiers ; `end` vaut null si absent. */
+export function toVisits(events, limit = 5) {
+  const parse = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00`) : new Date(s));
+  return events
+    .map((ev) => ({ uid: ev.uid, summary: ev.summary, start: parse(ev.start), end: ev.end ? parse(ev.end) : null }))
+    .sort((a, b) => a.start - b.start)
+    .slice(0, limit);
+}
+
+/** Format attendu par les services calendar : "YYYY-MM-DD HH:MM:SS", heure locale. */
+export function formatHaDateTime(date) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+}
+
+/** Plage saisie dans le formulaire → format calendar ; null si la fin n'est pas après le début. */
+export function visitRange({ date, start, end }) {
+  if (!date || !start || !end) return null;
+  const s = `${date} ${start}:00`;
+  const e = `${date} ${end}:00`;
+  return e > s ? { start: s, end: e } : null;
+}
 
 function batteryIcon(level) {
   if (isNaN(level)) return "mdi:battery-unknown";
@@ -384,6 +459,30 @@ const STYLES = `
     text-align: center;
   }
   .camera .private-msg ha-icon { --mdc-icon-size: 36px; display: block; margin: 0 auto 6px; }
+  .visits { display: flex; flex-direction: column; gap: 8px; }
+  .visits-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 14px; }
+  .visit { border-radius: 12px; padding: 10px 12px; background: rgba(255, 255, 255, 0.16); }
+  .visit.now { background: rgba(255, 255, 255, 0.34); box-shadow: inset 3px 0 0 #fff; }
+  .visit-title { font-weight: 600; }
+  .visit-when { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .visits-empty, .visits-error { font-size: 13px; opacity: 0.85; padding: 4px 2px; }
+  .visits-error { color: #ffd2d2; }
+  .visit-btn {
+    display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.16); color: #fff;
+    font-family: inherit; font-size: 13px; cursor: pointer;
+  }
+  .visit-btn ha-icon { --mdc-icon-size: 16px; }
+  .visit { position: relative; }
+  .visit-del { position: absolute; top: 8px; right: 8px; padding: 4px 8px; }
+  .visit-btn.primary { background: #fff; color: rgb(var(--accent-dark)); }
+  .visit-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.2); font-size: 13px; }
+  .visit-form label { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+  .visit-form input { font: inherit; padding: 6px 8px; border-radius: 8px; border: none; min-width: 0; width: 100%; box-sizing: border-box; }
+  .visit-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .visit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .cameras { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .cameras.multi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   /* ---------- Modes ---------- */
   .modes { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 12px; }
@@ -521,6 +620,7 @@ const STYLES = `
   ha-card { container-type: inline-size; }
   @container (max-width: 520px) {
     .modes { grid-template-columns: repeat(min(var(--cols), 2), minmax(0, 1fr)); }
+    .cameras.multi { grid-template-columns: minmax(0, 1fr); }
     .state { font-size: 20px; }
   }
 `;
@@ -550,6 +650,8 @@ class CustomizableAlarmCard extends HTMLElement {
       throw new Error(t("no_entity"));
     }
     this._config = { ...DEFAULTS, ...config };
+    this._cameras = normalizeCameras(this._config);
+    this._visitsLoaded = false;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
@@ -562,6 +664,15 @@ class CustomizableAlarmCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     setLang(hass);
+    const visitsState = this._config?.visits_calendar && hass.states[this._config.visits_calendar]?.state;
+    if (!this._visitsLoaded && this._config?.visits_calendar) {
+      this._visitsLoaded = true;
+      this._visitsCalState = visitsState;
+      this._refreshVisits();
+    } else if (this._visitsLoaded && visitsState !== this._visitsCalState) {
+      this._visitsCalState = visitsState;
+      this._refreshVisits();
+    }
     if (this._pending && this._config) {
       const state = hass.states[this._config.entity]?.state;
       const target = this._config.modes?.[this._pending.index]?.state;
@@ -576,17 +687,19 @@ class CustomizableAlarmCard extends HTMLElement {
 
   connectedCallback() {
     this._startCamera();
+    this._visitsTimer = setInterval(() => this._refreshVisits(), 5 * 60 * 1000);
   }
 
   disconnectedCallback() {
     clearInterval(this._camTimer);
     this._camTimer = null;
+    clearInterval(this._visitsTimer);
   }
 
   getCardSize() {
     const modes = (this._config?.modes || []).length;
     const rows = Math.ceil(modes / (this._config?.columns || 3));
-    return 3 + rows * 3 + (this._config?.camera_entity ? 4 : 0);
+    return 3 + rows * 3 + 4 * (this._cameras?.length || 0);
   }
 
   getGridOptions() {
@@ -600,8 +713,7 @@ class CustomizableAlarmCard extends HTMLElement {
     return [
       c.entity,
       c.history_entity,
-      c.camera_entity,
-      c.privacy_entity,
+      ...(this._cameras || []).flatMap((cam) => [cam.entity, cam.privacy_entity]),
       ...(c.info || []).map((i) => i.entity),
       ...(c.modes || []).map((m) => m.entity),
     ].filter(Boolean);
@@ -630,6 +742,96 @@ class CustomizableAlarmCard extends HTMLElement {
     if (st?.attributes.changed_by) return st.attributes.changed_by;
     const h = this._config.history_entity && this._hass.states[this._config.history_entity];
     return h?.attributes?.user || null;
+  }
+
+  // ---------- Passages (calendrier) ----------
+
+  async _loadVisits() {
+    const entity = this._config.visits_calendar;
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 86400000);
+    try {
+      const res = await this._hass.callWS({
+        type: "call_service",
+        domain: "calendar",
+        service: "get_events",
+        return_response: true,
+        target: { entity_id: entity },
+        service_data: { start_date_time: formatHaDateTime(now), end_date_time: formatHaDateTime(in30Days) },
+      });
+      return { ok: true, visits: toVisits(res.response[entity]?.events || []) };
+    } catch (err) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+
+  _createVisit({ summary, start, end }) {
+    return this._hass.callService("calendar", "create_event", {
+      entity_id: this._config.visits_calendar,
+      summary,
+      start_date_time: start,
+      end_date_time: end,
+    });
+  }
+
+  async _refreshVisits() {
+    if (!this._config?.visits_calendar || !this._hass) return;
+    this._visits = await this._loadVisits();
+    this._rerender();
+  }
+
+  _newVisitForm() {
+    const now = new Date();
+    const pad = (h) => `${String(h).padStart(2, "0")}:00`;
+    const start = Math.min(now.getHours() + 1, 23);
+    const end = Math.min(now.getHours() + 2, 23);
+    return {
+      summary: "",
+      date: formatHaDateTime(now).slice(0, 10),
+      start: pad(start),
+      end: end > start ? pad(end) : "23:59",
+    };
+  }
+
+  _deleteVisit(uid) {
+    return this._hass.callWS({ type: "calendar/event/delete", entity_id: this._config.visits_calendar, uid });
+  }
+
+  async _removeVisit(uid) {
+    if (this._visitDelConfirm !== uid) {
+      this._visitDelConfirm = uid;
+      clearTimeout(this._visitDelTimer);
+      this._visitDelTimer = setTimeout(() => {
+        this._visitDelConfirm = null;
+        this._rerender();
+      }, 3000);
+      return this._rerender();
+    }
+    clearTimeout(this._visitDelTimer);
+    this._visitDelConfirm = null;
+    try {
+      await this._deleteVisit(uid);
+    } catch (err) {
+      this._fire("hass-notification", { message: err.message || String(err) });
+    }
+    await this._refreshVisits();
+  }
+
+  async _saveVisit() {
+    const read = (k) => this.shadowRoot.querySelector(`[data-field="${k}"]`).value;
+    const form = { summary: read("summary"), date: read("date"), start: read("start"), end: read("end") };
+    const range = visitRange(form);
+    if (!range) {
+      this._visitForm = { ...form, error: t("visit_invalid") };
+      return this._rerender();
+    }
+    this._visitForm = null;
+    try {
+      await this._createVisit({ summary: form.summary || t("visit_default_name"), ...range });
+    } catch (err) {
+      this._fire("hass-notification", { message: err.message || String(err) });
+    }
+    await this._refreshVisits();
   }
 
   // ---------- Rendu ----------
@@ -682,8 +884,9 @@ class CustomizableAlarmCard extends HTMLElement {
           </div>
           ${chips ? `<div class="chips">${chips}</div>` : ""}
         </div>
-        ${this._renderCamera()}
+        ${this._renderCameras()}
         ${modes ? `<div class="modes">${modes}</div>` : ""}
+        ${this._renderVisits()}
         ${this._keypad ? this._renderKeypad() : ""}
       </ha-card>
     `;
@@ -753,17 +956,72 @@ class CustomizableAlarmCard extends HTMLElement {
       </button>`;
   }
 
-  _renderCamera() {
-    const c = this._config;
-    if (!c.camera_entity) return "";
-    const cam = this._hass.states[c.camera_entity];
-    if (!cam) return "";
+  _renderCameras() {
+    const cams = this._cameras || [];
+    if (!cams.length) return "";
+    const cells = cams.map((c) => this._renderCamera(c)).join("");
+    return `<div class="cameras ${cams.length > 1 ? "multi" : ""}">${cells}</div>`;
+  }
+
+  _renderCamera(c) {
+    const cam = this._hass.states[c.entity];
     const priv = c.privacy_entity && this._hass.states[c.privacy_entity]?.state === "on";
+    const name = c.name || cam?.attributes.friendly_name || c.entity;
     return `
-      <div class="camera ${priv ? "private" : ""}" data-action="more-info" data-entity="${esc(c.camera_entity)}">
-        <img alt="" onerror="this.style.visibility='hidden'" onload="this.style.visibility='visible'" />
-        <div class="cam-label">${priv ? "" : `<span class="live-dot"></span>`}${esc(c.camera_name || cam.attributes.friendly_name)}</div>
+      <div class="camera ${priv ? "private" : ""}" data-action="more-info" data-entity="${esc(c.entity)}">
+        ${cam ? `<img alt="" data-entity="${esc(c.entity)}" onerror="this.style.visibility='hidden'" onload="this.style.visibility='visible'" />` : ""}
+        <div class="cam-label">${priv || !cam ? "" : `<span class="live-dot"></span>`}${cam ? esc(name) : "? " + esc(c.entity)}</div>
         ${priv ? `<div class="private-msg"><div><ha-icon icon="mdi:eye-off-outline"></ha-icon>${t("privacy_on")}</div></div>` : ""}
+      </div>`;
+  }
+
+  _renderVisits() {
+    if (!this._config.visits_calendar) return "";
+    const v = this._visits;
+    let body = "";
+    if (v && !v.ok) body = `<div class="visits-error">${esc(t("visits_error"))}</div>`;
+    else if (v && !v.visits.length) body = `<div class="visits-empty">${esc(t("visits_empty"))}</div>`;
+    else if (v) body = v.visits.map((visit) => this._renderVisit(visit)).join("");
+    const form = this._visitForm ? this._renderVisitForm(this._visitForm) : "";
+    return `
+      <div class="visits">
+        <div class="visits-head">
+          <span>${esc(t("visits_title"))}</span>
+          ${this._visitForm ? "" : `<button class="visit-btn" data-action="visit-open"><ha-icon icon="mdi:plus"></ha-icon>${esc(t("add_visit"))}</button>`}
+        </div>
+        ${body}
+        ${form}
+      </div>`;
+  }
+
+  _renderVisit(visit) {
+    const now = Date.now();
+    const current = visit.start.getTime() <= now && (!visit.end || visit.end.getTime() > now);
+    const locale = lang === "fr" ? "fr-FR" : "en";
+    const hm = (d) => d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+    const day = visit.start.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
+    return `
+      <div class="visit ${current ? "now" : ""}">
+        <div class="visit-title">${esc(visit.summary || t("visit_default_name"))}</div>
+        <div class="visit-when">${esc(day)} · ${hm(visit.start)} – ${visit.end ? hm(visit.end) : esc(t("visit_no_end"))}</div>
+        ${visit.uid ? `<button class="visit-btn visit-del" data-action="visit-del" data-uid="${esc(visit.uid)}">${this._visitDelConfirm === visit.uid ? esc(t("visit_delete_confirm")) : `<ha-icon icon="mdi:delete-outline"></ha-icon>`}</button>` : ""}
+      </div>`;
+  }
+
+  _renderVisitForm(f) {
+    return `
+      <div class="visit-form">
+        <label>${esc(t("visit_title"))}<input data-field="summary" value="${esc(f.summary)}" /></label>
+        <div class="visit-row">
+          <label>${esc(t("visit_date"))}<input type="date" data-field="date" value="${esc(f.date)}" /></label>
+          <label>${esc(t("visit_start"))}<input type="time" data-field="start" value="${esc(f.start)}" /></label>
+          <label>${esc(t("visit_end"))}<input type="time" data-field="end" value="${esc(f.end)}" /></label>
+        </div>
+        ${f.error ? `<div class="visits-error">${esc(f.error)}</div>` : ""}
+        <div class="visit-actions">
+          <button class="visit-btn" data-action="visit-cancel">${esc(t("visit_cancel"))}</button>
+          <button class="visit-btn primary" data-action="visit-save">${esc(t("visit_save"))}</button>
+        </div>
       </div>`;
   }
 
@@ -797,11 +1055,11 @@ class CustomizableAlarmCard extends HTMLElement {
   }
 
   _updateCameraImage() {
-    const img = this.shadowRoot?.querySelector(".camera img");
-    const cam = this._config?.camera_entity && this._hass?.states[this._config.camera_entity];
-    if (!img || !cam?.attributes.entity_picture) return;
-    const url = cam.attributes.entity_picture;
-    img.src = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+    this.shadowRoot?.querySelectorAll(".camera img[data-entity]").forEach((img) => {
+      const url = this._hass?.states[img.dataset.entity]?.attributes.entity_picture;
+      if (!url) return;
+      img.src = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+    });
   }
 
   // ---------- Interactions ----------
@@ -824,6 +1082,20 @@ class CustomizableAlarmCard extends HTMLElement {
         break;
       case "key":
         this._onKey(key);
+        break;
+      case "visit-open":
+        this._visitForm = this._newVisitForm();
+        this._rerender();
+        break;
+      case "visit-cancel":
+        this._visitForm = null;
+        this._rerender();
+        break;
+      case "visit-save":
+        this._saveVisit();
+        break;
+      case "visit-del":
+        this._removeVisit(el.dataset.uid);
         break;
       case "keypad-bg":
         if (ev.target === el) this._closeKeypad();
@@ -942,19 +1214,17 @@ const GENERAL_SCHEMA = [
   { name: "entity", required: true, selector: { entity: { domain: "alarm_control_panel" } } },
   { name: "name", selector: { text: {} } },
   { name: "history_entity", selector: { entity: { domain: ["text", "sensor"] } } },
+  { name: "visits_calendar", selector: { entity: { domain: "calendar" } } },
 ];
 
-const CAMERA_SCHEMA = [
-  { name: "camera_entity", selector: { entity: { domain: "camera" } } },
-  {
-    type: "grid",
-    name: "",
-    schema: [
-      { name: "camera_name", selector: { text: {} } },
-      { name: "camera_refresh", selector: { number: { min: 2, max: 120, mode: "box", unit_of_measurement: "s" } } },
-    ],
-  },
+const CAMERA_ITEM_SCHEMA = [
+  { name: "entity", required: true, selector: { entity: { domain: "camera" } } },
+  { name: "name", selector: { text: {} } },
   { name: "privacy_entity", selector: { entity: { domain: ["switch", "input_boolean"] } } },
+];
+
+const CAMERA_GLOBAL_SCHEMA = [
+  { name: "camera_refresh", selector: { number: { min: 2, max: 120, mode: "box", unit_of_measurement: "s" } } },
 ];
 
 const lookSchema = () => [
@@ -1103,10 +1373,14 @@ class CustomizableAlarmCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._open = { modes: new Set(), info: new Set() };
+    this._open = { modes: new Set(), info: new Set(), cameras: new Set() };
   }
 
   setConfig(config) {
+    if (config.camera_entity && !config.cameras) {
+      config = migrateLegacyCamera(config);
+      this._emit(config);
+    }
     const json = JSON.stringify(config);
     this._config = JSON.parse(json);
     if (this._rendered && json === this._lastSent) {
@@ -1200,7 +1474,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
       if (f) f.data = data;
     };
     set("general", c);
-    set("camera", c);
+    set("camera-global", c);
     set("look", this._lookData());
     (c.modes || []).forEach((m, i) => {
       set(`mode-${i}`, this._formData(m, ["color"]));
@@ -1209,6 +1483,10 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     (c.info || []).forEach((it, i) => {
       set(`info-${i}`, it);
       this._updateInfoHead(i);
+    });
+    (c.cameras || []).forEach((cam, i) => {
+      set(`camera-${i}`, cam);
+      this._updateCameraHead(i);
     });
   }
 
@@ -1237,7 +1515,10 @@ class CustomizableAlarmCardEditor extends HTMLElement {
       </div>
       <div class="section">
         <div class="section-title"><ha-icon icon="mdi:cctv"></ha-icon>${t("section_camera")}</div>
+        <div class="hint">${t("hint_cameras")}</div>
         <div id="camera-slot"></div>
+        <div id="cameras"></div>
+        <button class="add" data-add="cameras"><ha-icon icon="mdi:plus"></ha-icon>${t("add_camera")}</button>
       </div>
       <div class="section">
         <div class="section-title"><ha-icon icon="mdi:palette-outline"></ha-icon>${t("section_look")}</div>
@@ -1249,9 +1530,9 @@ class CustomizableAlarmCardEditor extends HTMLElement {
     general.id = "general";
     root.getElementById("general-slot").appendChild(general);
 
-    const camera = this._makeForm(CAMERA_SCHEMA, c, (v) => this._emit(this._clean({ ...this._config, ...v })));
-    camera.id = "camera";
-    root.getElementById("camera-slot").appendChild(camera);
+    const cameraGlobal = this._makeForm(CAMERA_GLOBAL_SCHEMA, c, (v) => this._emit(this._clean({ ...this._config, ...v })));
+    cameraGlobal.id = "camera-global";
+    root.getElementById("camera-slot").appendChild(cameraGlobal);
 
     const look = this._makeForm(lookSchema(), this._lookData(), (v) => {
       const next = { ...this._config, ...v, state_colors: this._clean(v.state_colors || {}) };
@@ -1262,6 +1543,7 @@ class CustomizableAlarmCardEditor extends HTMLElement {
 
     this._renderList("modes");
     this._renderList("info");
+    this._renderList("cameras");
 
     root.querySelectorAll("[data-add]").forEach((btn) =>
       btn.addEventListener("click", () => this._addItem(btn.dataset.add))
@@ -1303,25 +1585,44 @@ class CustomizableAlarmCardEditor extends HTMLElement {
         const body = document.createElement("div");
         body.className = "item-body";
         const isMode = kind === "modes";
+        const schema = isMode ? modeSchema() : kind === "cameras" ? CAMERA_ITEM_SCHEMA : INFO_SCHEMA;
         const form = this._makeForm(
-          isMode ? modeSchema() : INFO_SCHEMA,
+          schema,
           isMode ? this._formData(item, ["color"]) : item,
           (v) => {
             const list = [...(this._config[kind] || [])];
             list[i] = this._clean(v);
             this._emit({ ...this._config, [kind]: list });
-            isMode ? this._updateModeHead(i) : this._updateInfoHead(i);
+            this._updateHead(kind, i);
           },
           isMode ? ["entity", "state"] : null
         );
-        form.id = `${isMode ? "mode" : "info"}-${i}`;
+        form.id = `${{ modes: "mode", info: "info", cameras: "camera" }[kind]}-${i}`;
         body.appendChild(form);
         wrap.appendChild(body);
       }
       wrap.dataset.index = i;
       container.appendChild(wrap);
-      kind === "modes" ? this._updateModeHead(i) : this._updateInfoHead(i);
+      this._updateHead(kind, i);
     });
+  }
+
+  _updateHead(kind, i) {
+    if (kind === "modes") this._updateModeHead(i);
+    else if (kind === "cameras") this._updateCameraHead(i);
+    else this._updateInfoHead(i);
+  }
+
+  _updateCameraHead(i) {
+    const el = this._itemEl("cameras", i);
+    const cam = (this._config.cameras || [])[i];
+    if (!el || !cam) return;
+    const st = cam.entity ? this._hass?.states[cam.entity] : undefined;
+    const swatch = el.querySelector(".swatch");
+    swatch.style.backgroundColor = "var(--primary-color)";
+    swatch.querySelector("ha-icon").setAttribute("icon", "mdi:cctv");
+    el.querySelector(".t").textContent = cam.name || st?.attributes.friendly_name || cam.entity || t("new_camera");
+    el.querySelector(".s").textContent = cam.entity || t("choose_entity");
   }
 
   _itemEl(kind, i) {

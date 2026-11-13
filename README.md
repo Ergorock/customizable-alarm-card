@@ -82,10 +82,12 @@ info:
 | `name` | Banner title | `Alarm` |
 | `history_entity` | Entity whose `user` attribute is used to show “by …” | |
 | `show_last_change` | Shows “since … by …” | `true` |
-| `camera_entity` | Camera shown under the banner | |
+| `camera_entity` | Single camera (kept for compatibility, same as one item of `cameras`) | |
 | `camera_name` | Name shown on the preview | entity name |
 | `camera_refresh` | Image refresh interval (s) | `10` |
-| `privacy_entity` | Switch that blurs the preview when `on` | |
+| `privacy_entity` | Switch that blurs the preview when `on` (single camera, kept for compatibility) | |
+| `cameras` | List of cameras, each with `entity`, `name` and its own `privacy_entity`. One preview per camera | |
+| `visits_calendar` | Calendar used for planned visits (see below). The section is hidden when not set | |
 | `columns` | Number of tile columns (2 max below 520 px wide) | `3` |
 | `tile_height` | Tile height (px) | `150` |
 | `glass` | Frosted glass background | `true` |
@@ -94,3 +96,14 @@ info:
 | `info` | List of chips: `entity`, `name`, `icon`, `low_threshold` (batteries) | |
 
 **Mode**: `name`, `label` (subtitle), `state` (alarm state that makes the tile “Active”), `entity` (scene / script / button to run; empty = direct `alarm_control_panel.alarm_*` call), `icon`, `image`, `color`, `confirm` (asks for a second tap).
+
+## Planned visits
+
+Use this to disarm the alarm while someone comes to the house at a known time, and re-arm it when they leave.
+
+1. Create a **Local Calendar** named *Alarme* (Settings → Devices & services → Add integration → Local Calendar).
+2. Create an `input_text` helper named `alarme_mode_avant_passage` (max length 255). It remembers the mode before the visit.
+3. Import the blueprint [alarm_planned_visit.yaml](https://github.com/Ergorock/customizable-alarm-card/blob/main/blueprints/automation/alarm_planned_visit.yaml) (Settings → Automations → Blueprints → Import) and create an automation from it with the calendar, the alarm and the helper.
+4. Set `visits_calendar` in the card. The card then lists the next visits, and lets you add one (title, date, start, end).
+
+At the start of a visit the alarm is disarmed. At the end it is re-armed in the mode it had before, but only if it is still disarmed. Nothing happens if the alarm was already disarmed at the start, or if it was changed by hand during the visit.
