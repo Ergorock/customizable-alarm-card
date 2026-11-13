@@ -91,6 +91,7 @@ const STRINGS = {
     visit_cancel: "Cancel",
     visit_invalid: "The end must be after the start",
     visit_no_end: "—",
+    visit_delete_confirm: "Tap again to delete",
     section_look: "Appearance",
     move_up: "Move up",
     move_down: "Move down",
@@ -182,6 +183,7 @@ const STRINGS = {
     visit_cancel: "Annuler",
     visit_invalid: "La fin doit être après le début",
     visit_no_end: "—",
+    visit_delete_confirm: "Toucher à nouveau pour supprimer",
     section_look: "Apparence",
     move_up: "Monter",
     move_down: "Descendre",
@@ -288,8 +290,9 @@ export function migrateLegacyCamera(config) {
 
 /** Passages : événements HA triés par début, les `limit` premiers ; `end` vaut null si absent. */
 export function toVisits(events, limit = 5) {
+  const parse = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00`) : new Date(s));
   return events
-    .map((ev) => ({ uid: ev.uid, summary: ev.summary, start: new Date(ev.start), end: ev.end ? new Date(ev.end) : null }))
+    .map((ev) => ({ uid: ev.uid, summary: ev.summary, start: parse(ev.start), end: ev.end ? parse(ev.end) : null }))
     .sort((a, b) => a.start - b.start)
     .slice(0, limit);
 }
@@ -470,6 +473,8 @@ const STYLES = `
     font-family: inherit; font-size: 13px; cursor: pointer;
   }
   .visit-btn ha-icon { --mdc-icon-size: 16px; }
+  .visit { position: relative; }
+  .visit-del { position: absolute; top: 8px; right: 8px; padding: 4px 8px; }
   .visit-btn.primary { background: #fff; color: rgb(var(--accent-dark)); }
   .visit-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.2); font-size: 13px; }
   .visit-form label { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
@@ -659,8 +664,13 @@ class CustomizableAlarmCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     setLang(hass);
+    const visitsState = this._config?.visits_calendar && hass.states[this._config.visits_calendar]?.state;
     if (!this._visitsLoaded && this._config?.visits_calendar) {
       this._visitsLoaded = true;
+      this._visitsCalState = visitsState;
+      this._refreshVisits();
+    } else if (this._visitsLoaded && visitsState !== this._visitsCalState) {
+      this._visitsCalState = visitsState;
       this._refreshVisits();
     }
     if (this._pending && this._config) {
@@ -772,8 +782,39 @@ class CustomizableAlarmCard extends HTMLElement {
 
   _newVisitForm() {
     const now = new Date();
-    const hour = (h) => `${String((now.getHours() + h) % 24).padStart(2, "0")}:00`;
-    return { summary: "", date: formatHaDateTime(now).slice(0, 10), start: hour(1), end: hour(2) };
+    const pad = (h) => `${String(h).padStart(2, "0")}:00`;
+    const start = Math.min(now.getHours() + 1, 23);
+    const end = Math.min(now.getHours() + 2, 23);
+    return {
+      summary: "",
+      date: formatHaDateTime(now).slice(0, 10),
+      start: pad(start),
+      end: end > start ? pad(end) : "23:59",
+    };
+  }
+
+  _deleteVisit(uid) {
+    return this._hass.callWS({ type: "calendar/event/delete", entity_id: this._config.visits_calendar, uid });
+  }
+
+  async _removeVisit(uid) {
+    if (this._visitDelConfirm !== uid) {
+      this._visitDelConfirm = uid;
+      clearTimeout(this._visitDelTimer);
+      this._visitDelTimer = setTimeout(() => {
+        this._visitDelConfirm = null;
+        this._rerender();
+      }, 3000);
+      return this._rerender();
+    }
+    clearTimeout(this._visitDelTimer);
+    this._visitDelConfirm = null;
+    try {
+      await this._deleteVisit(uid);
+    } catch (err) {
+      this._fire("hass-notification", { message: err.message || String(err) });
+    }
+    await this._refreshVisits();
   }
 
   async _saveVisit() {
@@ -963,6 +1004,7 @@ class CustomizableAlarmCard extends HTMLElement {
       <div class="visit ${current ? "now" : ""}">
         <div class="visit-title">${esc(visit.summary || t("visit_default_name"))}</div>
         <div class="visit-when">${esc(day)} · ${hm(visit.start)} – ${visit.end ? hm(visit.end) : esc(t("visit_no_end"))}</div>
+        ${visit.uid ? `<button class="visit-btn visit-del" data-action="visit-del" data-uid="${esc(visit.uid)}">${this._visitDelConfirm === visit.uid ? esc(t("visit_delete_confirm")) : `<ha-icon icon="mdi:delete-outline"></ha-icon>`}</button>` : ""}
       </div>`;
   }
 
@@ -1051,6 +1093,9 @@ class CustomizableAlarmCard extends HTMLElement {
         break;
       case "visit-save":
         this._saveVisit();
+        break;
+      case "visit-del":
+        this._removeVisit(el.dataset.uid);
         break;
       case "keypad-bg":
         if (ev.target === el) this._closeKeypad();

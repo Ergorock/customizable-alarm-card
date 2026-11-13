@@ -32,3 +32,13 @@ test("runs queued, at most five at a time", () => {
   assert.match(text, /^mode: queued$/m);
   assert.match(text, /^max: 5$/m);
 });
+
+test("arming back waits a few seconds and skips while another visit is still on the calendar", () => {
+  assert.match(text, /- delay: "00:00:05"/);
+  assert.match(text, /entity_id: !input visits_calendar\n\s+state: "off"/);
+});
+
+test("starting a visit while the alarm is already disarmed leaves the memory alone", () => {
+  const start = text.slice(text.indexOf("id: start\n"), text.indexOf("- conditions:\n          - condition: trigger\n            id: end"));
+  assert.doesNotMatch(start, /else:/);
+});

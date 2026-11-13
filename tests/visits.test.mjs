@@ -48,3 +48,11 @@ test("an end that is not after the start is rejected", () => {
 test("a missing field is rejected", () => {
   assert.equal(visitRange({ date: "", start: "09:00", end: "10:00" }), null);
 });
+
+test("an all-day event date is read as local midnight, not UTC", () => {
+  const [visit] = toVisits([{ summary: "Journée", start: "2026-11-14" }]);
+  assert.equal(visit.start.getFullYear(), 2026);
+  assert.equal(visit.start.getMonth(), 10);
+  assert.equal(visit.start.getDate(), 14);
+  assert.equal(visit.start.getHours(), 0);
+});

@@ -4,7 +4,8 @@ blueprint:
     Désarme l'alarme au début d'un événement du calendrier des passages, puis la
     réarme à la fin dans le mode qu'elle avait avant. Ne fait rien si l'alarme
     était déjà désarmée au début, ou si elle a été changée à la main pendant le
-    passage.
+    passage. Si un autre passage est en cours à la fin, rien n'est réarmé avant
+    la fin du dernier.
   domain: automation
   source_url: https://github.com/Ergorock/customizable-alarm-card/blob/main/blueprints/automation/alarm_planned_visit.yaml
   min_version: 2026.1.0
@@ -70,66 +71,66 @@ actions:
               - action: alarm_control_panel.alarm_disarm
                 target:
                   entity_id: !input alarm_entity
-            else:
+      - conditions:
+          - condition: trigger
+            id: end
+        sequence:
+          - delay: "00:00:05"
+          - if:
+              - condition: state
+                entity_id: !input visits_calendar
+                state: "off"
+            then:
+              - if:
+                  - condition: state
+                    entity_id: !input alarm_entity
+                    state: disarmed
+                  - condition: template
+                    value_template: "{{ states(memory_helper) not in ['', 'unknown', 'unavailable'] }}"
+                then:
+                  - choose:
+                      - conditions:
+                          - condition: state
+                            entity_id: !input memory_helper
+                            state: armed_home
+                        sequence:
+                          - action: alarm_control_panel.alarm_arm_home
+                            target:
+                              entity_id: !input alarm_entity
+                      - conditions:
+                          - condition: state
+                            entity_id: !input memory_helper
+                            state: armed_away
+                        sequence:
+                          - action: alarm_control_panel.alarm_arm_away
+                            target:
+                              entity_id: !input alarm_entity
+                      - conditions:
+                          - condition: state
+                            entity_id: !input memory_helper
+                            state: armed_night
+                        sequence:
+                          - action: alarm_control_panel.alarm_arm_night
+                            target:
+                              entity_id: !input alarm_entity
+                      - conditions:
+                          - condition: state
+                            entity_id: !input memory_helper
+                            state: armed_vacation
+                        sequence:
+                          - action: alarm_control_panel.alarm_arm_vacation
+                            target:
+                              entity_id: !input alarm_entity
+                      - conditions:
+                          - condition: state
+                            entity_id: !input memory_helper
+                            state: armed_custom_bypass
+                        sequence:
+                          - action: alarm_control_panel.alarm_arm_custom_bypass
+                            target:
+                              entity_id: !input alarm_entity
               - action: input_text.set_value
                 target:
                   entity_id: !input memory_helper
                 data:
                   value: ""
-      - conditions:
-          - condition: trigger
-            id: end
-        sequence:
-          - if:
-              - condition: state
-                entity_id: !input alarm_entity
-                state: disarmed
-              - condition: template
-                value_template: "{{ states(memory_helper) not in ['', 'unknown', 'unavailable'] }}"
-            then:
-              - choose:
-                  - conditions:
-                      - condition: state
-                        entity_id: !input memory_helper
-                        state: armed_home
-                    sequence:
-                      - action: alarm_control_panel.alarm_arm_home
-                        target:
-                          entity_id: !input alarm_entity
-                  - conditions:
-                      - condition: state
-                        entity_id: !input memory_helper
-                        state: armed_away
-                    sequence:
-                      - action: alarm_control_panel.alarm_arm_away
-                        target:
-                          entity_id: !input alarm_entity
-                  - conditions:
-                      - condition: state
-                        entity_id: !input memory_helper
-                        state: armed_night
-                    sequence:
-                      - action: alarm_control_panel.alarm_arm_night
-                        target:
-                          entity_id: !input alarm_entity
-                  - conditions:
-                      - condition: state
-                        entity_id: !input memory_helper
-                        state: armed_vacation
-                    sequence:
-                      - action: alarm_control_panel.alarm_arm_vacation
-                        target:
-                          entity_id: !input alarm_entity
-                  - conditions:
-                      - condition: state
-                        entity_id: !input memory_helper
-                        state: armed_custom_bypass
-                    sequence:
-                      - action: alarm_control_panel.alarm_arm_custom_bypass
-                        target:
-                          entity_id: !input alarm_entity
-          - action: input_text.set_value
-            target:
-              entity_id: !input memory_helper
-            data:
-              value: ""
