@@ -48,6 +48,7 @@ const STRINGS = {
     label_entity: "Alarm entity",
     label_name: "Title",
     label_history_entity: "History entity (optional, for “by …”)",
+    label_visits_calendar: "Visits calendar",
     label_camera_entity: "Camera (optional)",
     label_camera_name: "Camera display name",
     label_privacy_entity: "Privacy mode switch (blurs the camera)",
@@ -138,6 +139,7 @@ const STRINGS = {
     label_entity: "Entité alarme",
     label_name: "Titre",
     label_history_entity: "Entité historique (optionnelle, pour « par … »)",
+    label_visits_calendar: "Calendrier des passages",
     label_camera_entity: "Caméra (optionnelle)",
     label_camera_name: "Nom affiché de la caméra",
     label_privacy_entity: "Interrupteur mode privé (floute la caméra)",
@@ -1167,6 +1169,7 @@ const GENERAL_SCHEMA = [
   { name: "entity", required: true, selector: { entity: { domain: "alarm_control_panel" } } },
   { name: "name", selector: { text: {} } },
   { name: "history_entity", selector: { entity: { domain: ["text", "sensor"] } } },
+  { name: "visits_calendar", selector: { entity: { domain: "calendar" } } },
 ];
 
 const CAMERA_ITEM_SCHEMA = [
